@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split Image Generator | TODAY Toolbox</title>
+<link rel="stylesheet" href="../assets/toolbox.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header tool-header">
+    <a class="back-link" href="../index.html">&larr; Toolbox</a>
+    <img src="../assets/logo.png" alt="TODAY" class="site-logo">
+    <div>
+      <h1>Split Image Generator</h1>
+      <p class="subtitle">Diagonal split graphics &mdash; 2400&times;1200 or 1000&times;1000, JPG export</p>
+    </div>
+  </header>
+
+  <main class="tool-main">
+    <section class="layout-panel" aria-label="Layout options">
+      <div class="control-group">
+        <span class="control-label">Splits</span>
+        <div class="segmented" id="splitsGroup">
+          <button type="button" data-value="2" class="active">2-Split</button>
+          <button type="button" data-value="3">3-Split</button>
+          <button type="button" data-value="4">4-Split</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="control-label">Output size</span>
+        <div class="segmented" id="sizeGroup">
+          <button type="button" data-value="wide" class="active">2400 &times; 1200 (2:1)</button>
+          <button type="button" data-value="square">1000 &times; 1000 (1:1)</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="upload-row" id="uploadRow" aria-label="Image uploads"></section>
+
+    <section class="canvas-wrap">
+      <canvas id="canvas" width="2400" height="1200"></canvas>
+    </section>
+
+    <section class="export-panel" aria-label="Export">
+      <label for="filename">File name</label>
+      <input id="filename" type="text" placeholder="split-image" autocomplete="off">
+      <button type="button" id="downloadBtn">Download JPG</button>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

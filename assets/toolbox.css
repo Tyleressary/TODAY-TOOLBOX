@@ -1,0 +1,105 @@
+:root {
+  --accent: #ff4438;
+  --accent-dark: #d6301f;
+  --bg: #17181a;
+  --bg-elevated: #202226;
+  --border: #34363b;
+  --text: #f2f2f2;
+  --text-dim: #a6a8ad;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 32px clamp(20px, 5vw, 64px) 16px;
+}
+
+.site-logo {
+  width: 56px;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.site-header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+  padding: 16px clamp(20px, 5vw, 64px) 48px;
+}
+
+.tool-card {
+  display: block;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+a.tool-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+.tool-card-thumb {
+  aspect-ratio: 2 / 1;
+  overflow: hidden;
+}
+
+.tool-card-thumb svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.tool-card-body {
+  padding: 16px 18px 20px;
+}
+
+.tool-card-body h2 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+}
+
+.tool-card-body p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.tool-card-placeholder {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.site-footer {
+  padding: 20px clamp(20px, 5vw, 64px) 40px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+}
