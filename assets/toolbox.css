@@ -77,8 +77,8 @@ a { color: inherit; }
 }
 
 .site-logo {
-  width: 56px;
-  height: auto;
+  height: 32px;
+  width: auto;
   flex-shrink: 0;
 }
 
@@ -109,7 +109,7 @@ a { color: inherit; }
 }
 
 .home-header .site-logo {
-  width: 84px;
+  height: 52px;
 }
 
 .home-header h1 {
