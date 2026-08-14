@@ -1,11 +1,56 @@
 :root {
-  --accent: #ff4438;
-  --accent-dark: #d6301f;
-  --bg: #17181a;
-  --bg-elevated: #202226;
-  --border: #34363b;
-  --text: #f2f2f2;
-  --text-dim: #a6a8ad;
+  /* palette ramps — see docs/color-palette.md */
+  --red-100: #ffecea;
+  --red-200: #ffc7c2;
+  --red-300: #ff8f84;
+  --red-400: #ff6859;
+  --red-500: #ff513c;
+  --red-600: #ff3a2c;
+
+  --purple-100: #f8e8fd;
+  --purple-200: #e4c7f0;
+  --purple-300: #c8a2d7;
+  --purple-400: #ae7dc9;
+  --purple-500: #7f479e;
+  --purple-600: #652e84;
+
+  --blue-100: #eef9ff;
+  --blue-200: #c9edfa;
+  --blue-300: #8cdcf7;
+  --blue-400: #63cff5;
+  --blue-500: #4acaf1;
+  --blue-600: #2cc4f1;
+
+  --amber-100: #fff6ea;
+  --amber-200: #ffe3c0;
+  --amber-300: #ffc87e;
+  --amber-400: #ffb64d;
+  --amber-500: #feae30;
+  --amber-600: #fea300;
+
+  --green-100: #e4efea;
+  --green-200: #add1c0;
+  --green-300: #58a380;
+  --green-400: #008357;
+  --green-500: #00733e;
+  --green-600: #006327;
+
+  --gray-100: #f0f2f5;
+  --gray-200: #d8dde5;
+  --gray-300: #abb4c2;
+  --gray-400: #7b838f;
+  --gray-500: #4a515c;
+  --gray-600: #363b43;
+
+  /* semantic tokens */
+  --bg: #ffffff;
+  --bg-elevated: var(--gray-100);
+  --border: var(--gray-200);
+  --text: var(--gray-600);
+  --text-dim: var(--gray-400);
+  --accent: var(--red-500);
+  --accent-dark: var(--red-600);
+  --focus: var(--blue-500);
 }
 
 * { box-sizing: border-box; }
@@ -15,6 +60,13 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
+}
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .site-header {

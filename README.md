@@ -14,11 +14,15 @@ Then open `http://localhost:8000/`.
 
 ### Split Image Generator (`/split-image/`)
 
-Builds diagonal split-image graphics for social/promo use:
+Builds split-image graphics for social/promo use:
 
-- 2, 3, or 4-way split, each with a fixed evenly-spaced diagonal divider (angle is not user-adjustable).
-- Output size: 2400×1200 (2:1) or 1000×1000 (1:1 square).
+- Layouts: 2-split, 3-split, 4-split (all straight vertical dividers), or 4-split horizontal (straight horizontal dividers). Divider position is fixed and evenly spaced — not user-adjustable.
+- Output size: 2400×1200 (2:1) or 1000×1000 (1:1 square). Square output only supports the 2-split layout.
 - Upload one image per panel; drag on the canvas to reposition, use each slot's zoom slider to scale.
 - Enter a file name and export as a single flattened JPG at full output resolution.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
+
+## Design
+
+Shared color palette and tokens live in `assets/toolbox.css` (`:root`), documented in `docs/color-palette.md`.

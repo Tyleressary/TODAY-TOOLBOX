@@ -70,13 +70,19 @@
   border-right: none;
 }
 
-.segmented button:hover {
-  background: rgba(255, 255, 255, 0.06);
+.segmented button:hover:not(:disabled) {
+  background: var(--border);
 }
 
 .segmented button.active {
   background: var(--accent);
   color: #fff;
+}
+
+.segmented button:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .upload-row {
@@ -139,7 +145,7 @@
   border-radius: 6px;
   touch-action: none;
   cursor: grab;
-  background: #1a1a1a;
+  background: var(--gray-100);
 }
 
 #canvas:active {

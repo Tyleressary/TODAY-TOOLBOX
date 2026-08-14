@@ -1,13 +1,24 @@
 (() => {
   'use strict';
 
-  const DIVIDER_FRACTION = 0.18; // fixed diagonal shear as a fraction of canvas width
   const MAX_ZOOM = 3;
 
   const SIZES = {
     wide: { w: 2400, h: 1200 },
     square: { w: 1000, h: 1000 },
   };
+
+  // Fixed layouts. Orientation controls whether panels stack side-by-side
+  // (vertical dividers) or top-to-bottom (horizontal dividers).
+  const LAYOUTS = {
+    '2': { count: 2, orientation: 'vertical' },
+    '3': { count: 3, orientation: 'vertical' },
+    '4': { count: 4, orientation: 'vertical' },
+    '4h': { count: 4, orientation: 'horizontal' },
+  };
+
+  // Square output only offers the 2-split layout.
+  const SQUARE_ONLY_LAYOUT = '2';
 
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -17,7 +28,7 @@
   const filenameInput = document.getElementById('filename');
   const downloadBtn = document.getElementById('downloadBtn');
 
-  let splitCount = 2;
+  let layoutId = '2';
   let sizeMode = 'wide';
   let panels = []; // panels[i] = { img, scaleMultiplier, panX, panY } | undefined
   let dragState = null;
@@ -26,53 +37,25 @@
     return SIZES[sizeMode];
   }
 
+  function getLayout() {
+    return LAYOUTS[layoutId];
+  }
+
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
   }
 
-  function dividerX(i, y, w, h, n) {
-    if (i === 0) return 0;
-    if (i === n) return w;
-    const baseX = (w * i) / n;
-    const shear = w * DIVIDER_FRACTION;
-    const t = h === 0 ? 0 : y / h;
-    return baseX + (-shear / 2 + shear * t);
-  }
-
-  function getPanelPolygon(i, w, h, n) {
-    const leftTop = dividerX(i, 0, w, h, n);
-    const leftBottom = dividerX(i, h, w, h, n);
-    const rightTop = dividerX(i + 1, 0, w, h, n);
-    const rightBottom = dividerX(i + 1, h, w, h, n);
-    return [
-      [leftTop, 0],
-      [rightTop, 0],
-      [rightBottom, h],
-      [leftBottom, h],
-    ];
-  }
-
-  function getBBox(poly) {
-    const xs = poly.map((p) => p[0]);
-    const ys = poly.map((p) => p[1]);
-    return {
-      minX: Math.min(...xs),
-      maxX: Math.max(...xs),
-      minY: Math.min(...ys),
-      maxY: Math.max(...ys),
-    };
-  }
-
-  function pointInPolygon(x, y, poly) {
-    let inside = false;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const [xi, yi] = poly[i];
-      const [xj, yj] = poly[j];
-      const intersect =
-        yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-      if (intersect) inside = !inside;
+  function getPanelRect(i, w, h, layout) {
+    if (layout.orientation === 'horizontal') {
+      const stripH = h / layout.count;
+      return { minX: 0, maxX: w, minY: i * stripH, maxY: (i + 1) * stripH };
     }
-    return inside;
+    const stripW = w / layout.count;
+    return { minX: i * stripW, maxX: (i + 1) * stripW, minY: 0, maxY: h };
+  }
+
+  function pointInRect(x, y, rect) {
+    return x >= rect.minX && x <= rect.maxX && y >= rect.minY && y <= rect.maxY;
   }
 
   function panelImageMetrics(panel, bbox) {
@@ -86,7 +69,7 @@
     const halfExtraH = Math.max(0, (drawH - bboxH) / 2);
     const panXpx = clamp(panel.panX * bboxW, -halfExtraW, halfExtraW);
     const panYpx = clamp(panel.panY * bboxH, -halfExtraH, halfExtraH);
-    return { bboxW, bboxH, drawW, drawH, panXpx, panYpx };
+    return { drawW, drawH, panXpx, panYpx };
   }
 
   function drawPanelImage(panel, bbox) {
@@ -97,44 +80,54 @@
   }
 
   function drawPlaceholder(bbox, index, w) {
-    ctx.fillStyle = '#2c2e33';
+    ctx.fillStyle = '#d8dde5';
     ctx.fillRect(bbox.minX, bbox.minY, bbox.maxX - bbox.minX, bbox.maxY - bbox.minY);
     const cx = bbox.minX + (bbox.maxX - bbox.minX) / 2;
     const cy = bbox.minY + (bbox.maxY - bbox.minY) / 2;
-    ctx.fillStyle = '#6b6e76';
+    ctx.fillStyle = '#4a515c';
     ctx.font = `${Math.round(w * 0.02)}px -apple-system, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`Image ${index + 1}`, cx, cy);
   }
 
-  function drawDividers(w, h, n) {
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = Math.max(2, w * 0.0035);
-    for (let i = 1; i < n; i++) {
+  function drawDividers(w, h, layout) {
+    for (let i = 1; i < layout.count; i++) {
       ctx.beginPath();
-      ctx.moveTo(dividerX(i, 0, w, h, n), 0);
-      ctx.lineTo(dividerX(i, h, w, h, n), h);
+      if (layout.orientation === 'horizontal') {
+        const y = (h * i) / layout.count;
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+      } else {
+        const x = (w * i) / layout.count;
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+      }
+      // dark shadow first so the white line stays visible over light content
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+      ctx.lineWidth = Math.max(3, w * 0.005);
+      ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(2, w * 0.0035);
       ctx.stroke();
     }
   }
 
   function render() {
     const { w, h } = getDims();
+    const layout = getLayout();
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== h) canvas.height = h;
 
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = '#f0f2f5';
     ctx.fillRect(0, 0, w, h);
 
-    for (let i = 0; i < splitCount; i++) {
-      const poly = getPanelPolygon(i, w, h, splitCount);
-      const bbox = getBBox(poly);
+    for (let i = 0; i < layout.count; i++) {
+      const bbox = getPanelRect(i, w, h, layout);
       ctx.save();
       ctx.beginPath();
-      poly.forEach(([x, y], idx) => (idx === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-      ctx.closePath();
+      ctx.rect(bbox.minX, bbox.minY, bbox.maxX - bbox.minX, bbox.maxY - bbox.minY);
       ctx.clip();
       const panel = panels[i];
       if (panel && panel.img) {
@@ -145,12 +138,13 @@
       ctx.restore();
     }
 
-    drawDividers(w, h, splitCount);
+    drawDividers(w, h, layout);
   }
 
   function buildUploadSlots() {
+    const layout = getLayout();
     uploadRow.innerHTML = '';
-    for (let i = 0; i < splitCount; i++) {
+    for (let i = 0; i < layout.count; i++) {
       const panel = panels[i];
       const slot = document.createElement('div');
       slot.className = 'upload-slot' + (panel && panel.img ? ' has-image' : '');
@@ -207,10 +201,12 @@
     img.src = URL.createObjectURL(file);
   }
 
-  function setSplitCount(n) {
-    if (n === splitCount) return;
-    splitCount = n;
-    panels.length = n;
+  function setLayout(id) {
+    if (id === layoutId) return;
+    if (sizeMode === 'square' && id !== SQUARE_ONLY_LAYOUT) return;
+    layoutId = id;
+    panels.length = getLayout().count;
+    updateSplitsUI();
     buildUploadSlots();
     render();
   }
@@ -218,21 +214,33 @@
   function setSizeMode(mode) {
     if (mode === sizeMode) return;
     sizeMode = mode;
+    if (sizeMode === 'square' && layoutId !== SQUARE_ONLY_LAYOUT) {
+      layoutId = SQUARE_ONLY_LAYOUT;
+      panels.length = getLayout().count;
+      buildUploadSlots();
+    }
+    updateSplitsUI();
     render();
   }
 
-  function wireSegmented(group, onChange) {
-    group.querySelectorAll('button').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        group.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        onChange(btn.dataset.value);
-      });
+  function updateSplitsUI() {
+    splitsGroup.querySelectorAll('button').forEach((btn) => {
+      const id = btn.dataset.value;
+      btn.classList.toggle('active', id === layoutId);
+      const allowed = sizeMode !== 'square' || id === SQUARE_ONLY_LAYOUT;
+      btn.disabled = !allowed;
+    });
+    sizeGroup.querySelectorAll('button').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.value === sizeMode);
     });
   }
 
-  wireSegmented(splitsGroup, (value) => setSplitCount(parseInt(value, 10)));
-  wireSegmented(sizeGroup, (value) => setSizeMode(value));
+  splitsGroup.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => setLayout(btn.dataset.value));
+  });
+  sizeGroup.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => setSizeMode(btn.dataset.value));
+  });
 
   function clientToCanvas(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
@@ -243,12 +251,13 @@
 
   canvas.addEventListener('pointerdown', (e) => {
     const { w, h } = getDims();
+    const layout = getLayout();
     const { x, y } = clientToCanvas(e.clientX, e.clientY);
-    for (let i = splitCount - 1; i >= 0; i--) {
+    for (let i = layout.count - 1; i >= 0; i--) {
       const panel = panels[i];
       if (!panel || !panel.img) continue;
-      const poly = getPanelPolygon(i, w, h, splitCount);
-      if (pointInPolygon(x, y, poly)) {
+      const rect = getPanelRect(i, w, h, layout);
+      if (pointInRect(x, y, rect)) {
         dragState = { index: i, startX: x, startY: y, startPanX: panel.panX, startPanY: panel.panY };
         canvas.setPointerCapture(e.pointerId);
         break;
@@ -259,13 +268,13 @@
   canvas.addEventListener('pointermove', (e) => {
     if (!dragState) return;
     const { w, h } = getDims();
+    const layout = getLayout();
     const { x, y } = clientToCanvas(e.clientX, e.clientY);
     const dx = x - dragState.startX;
     const dy = y - dragState.startY;
     const panel = panels[dragState.index];
     if (!panel) return;
-    const poly = getPanelPolygon(dragState.index, w, h, splitCount);
-    const bbox = getBBox(poly);
+    const bbox = getPanelRect(dragState.index, w, h, layout);
     const bboxW = bbox.maxX - bbox.minX;
     const bboxH = bbox.maxY - bbox.minY;
     const startPanXpx = dragState.startPanX * bboxW;
@@ -296,6 +305,7 @@
     a.remove();
   });
 
+  updateSplitsUI();
   buildUploadSlots();
   render();
 })();
