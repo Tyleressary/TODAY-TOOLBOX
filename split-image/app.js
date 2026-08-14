@@ -8,13 +8,14 @@
     square: { w: 1000, h: 1000 },
   };
 
-  // Fixed layouts. Orientation controls whether panels stack side-by-side
-  // (vertical dividers) or top-to-bottom (horizontal dividers).
+  // Fixed layouts. Orientation controls how panels are arranged: side-by-side
+  // (vertical dividers), top-to-bottom (horizontal dividers), or a 2x2 grid
+  // (one vertical + one horizontal divider, crossing in the middle).
   const LAYOUTS = {
     '2': { count: 2, orientation: 'vertical' },
     '3': { count: 3, orientation: 'vertical' },
     '4': { count: 4, orientation: 'vertical' },
-    '4h': { count: 4, orientation: 'horizontal' },
+    '4g': { count: 4, orientation: 'grid' },
   };
 
   // Square output only offers the 2-split layout.
@@ -46,6 +47,12 @@
   }
 
   function getPanelRect(i, w, h, layout) {
+    if (layout.orientation === 'grid') {
+      // 0 = top-left, 1 = top-right, 2 = bottom-left, 3 = bottom-right
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      return { minX: (col * w) / 2, maxX: ((col + 1) * w) / 2, minY: (row * h) / 2, maxY: ((row + 1) * h) / 2 };
+    }
     if (layout.orientation === 'horizontal') {
       const stripH = h / layout.count;
       return { minX: 0, maxX: w, minY: i * stripH, maxY: (i + 1) * stripH };
@@ -91,21 +98,29 @@
     ctx.fillText(`Image ${index + 1}`, cx, cy);
   }
 
+  function strokeLine(x1, y1, x2, y2, w) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(2, w * 0.0035);
+    ctx.stroke();
+  }
+
   function drawDividers(w, h, layout) {
+    if (layout.orientation === 'grid') {
+      strokeLine(w / 2, 0, w / 2, h, w);
+      strokeLine(0, h / 2, w, h / 2, w);
+      return;
+    }
     for (let i = 1; i < layout.count; i++) {
-      ctx.beginPath();
       if (layout.orientation === 'horizontal') {
         const y = (h * i) / layout.count;
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
+        strokeLine(0, y, w, y, w);
       } else {
         const x = (w * i) / layout.count;
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, h);
+        strokeLine(x, 0, x, h, w);
       }
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = Math.max(2, w * 0.0035);
-      ctx.stroke();
     }
   }
 

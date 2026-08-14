@@ -70,7 +70,7 @@
   border-right: none;
 }
 
-.segmented button:hover:not(:disabled) {
+.segmented button:hover:not(:disabled):not(.active) {
   background: var(--border);
 }
 
