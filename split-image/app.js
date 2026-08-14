@@ -103,10 +103,6 @@
         ctx.moveTo(x, 0);
         ctx.lineTo(x, h);
       }
-      // dark shadow first so the white line stays visible over light content
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
-      ctx.lineWidth = Math.max(3, w * 0.005);
-      ctx.stroke();
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = Math.max(2, w * 0.0035);
       ctx.stroke();
