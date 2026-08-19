@@ -29,7 +29,10 @@ A hub page collecting reusable layouts for recurring franchises and other editor
 
 - 15-box split: 5 across × 3 down at 2400×1200, so every box is 480×400.
 - Layout and output size are fixed by design — there are no split or size options.
-- Upload one image per box; each is cover-fitted, drag on the canvas to reposition, use each slot's zoom slider to scale.
+- Fill each box with either an image or a flat color:
+  - Image: upload one per box; each is cover-fitted, drag on the canvas to reposition, use each slot's zoom slider to scale.
+  - Color: pick from the dropdown under the file input — all 36 palette colors (six ramps × six steps) plus white, grouped by ramp, with a swatch showing the current pick.
+  - The two are mutually exclusive per box — setting one clears the other. Choosing the blank dropdown option empties the box again.
 - White dividers on every seam, matching the Split Image Generator.
 - Enter a file name and export as a single flattened JPG at full 2400×1200 resolution.
 

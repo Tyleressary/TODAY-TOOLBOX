@@ -3,6 +3,19 @@
 
   const MAX_ZOOM = 3;
 
+  // Toolbox palette — six ramps, 100 (lightest) to 600 (most saturated).
+  // Mirrors assets/toolbox.css :root and docs/color-palette.md.
+  const PALETTE = [
+    ['Red',    ['#FFECEA', '#FFC7C2', '#FF8F84', '#FF6859', '#FF513C', '#FF3A2C']],
+    ['Purple', ['#F8E8FD', '#E4C7F0', '#C8A2D7', '#AE7DC9', '#7F479E', '#652E84']],
+    ['Blue',   ['#EEF9FF', '#C9EDFA', '#8CDCF7', '#63CFF5', '#4ACAF1', '#2CC4F1']],
+    ['Amber',  ['#FFF6EA', '#FFE3C0', '#FFC87E', '#FFB64D', '#FEAE30', '#FEA300']],
+    ['Green',  ['#E4EFEA', '#ADD1C0', '#58A380', '#008357', '#00733E', '#006327']],
+    ['Gray',   ['#F0F2F5', '#D8DDE5', '#ABB4C2', '#7B838F', '#4A515C', '#363B43']],
+  ];
+  const STEPS = [100, 200, 300, 400, 500, 600];
+  const WHITE = '#FFFFFF';
+
   // Fixed template: a 5-across, 3-down grid of 15 boxes on a 2400x1200 canvas,
   // so each box lands at 480x400. Nothing here is user-configurable — the whole
   // point of the template is that every trivia tease comes out the same shape.
@@ -18,7 +31,9 @@
   const filenameInput = document.getElementById('filename');
   const downloadBtn = document.getElementById('downloadBtn');
 
-  let panels = []; // panels[i] = { img, scaleMultiplier, panX, panY } | undefined
+  // panels[i] is an image fill { img, scaleMultiplier, panX, panY },
+  // a solid fill { color }, or undefined for an empty box.
+  let panels = [];
   let dragState = null;
 
   function clamp(v, min, max) {
@@ -62,6 +77,11 @@
     const centerX = bbox.minX + (bbox.maxX - bbox.minX) / 2 + panXpx;
     const centerY = bbox.minY + (bbox.maxY - bbox.minY) / 2 + panYpx;
     ctx.drawImage(panel.img, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
+  }
+
+  function drawColor(bbox, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(bbox.minX, bbox.minY, bbox.maxX - bbox.minX, bbox.maxY - bbox.minY);
   }
 
   function drawPlaceholder(bbox, index) {
@@ -110,6 +130,8 @@
       const panel = panels[i];
       if (panel && panel.img) {
         drawPanelImage(panel, bbox);
+      } else if (panel && panel.color) {
+        drawColor(bbox, panel.color);
       } else {
         drawPlaceholder(bbox, i);
       }
@@ -124,7 +146,8 @@
     for (let i = 0; i < COUNT; i++) {
       const panel = panels[i];
       const slot = document.createElement('div');
-      slot.className = 'upload-slot' + (panel && panel.img ? ' has-image' : '');
+      const filled = !!(panel && (panel.img || panel.color));
+      slot.className = 'upload-slot' + (filled ? ' has-image' : '');
       slot.dataset.index = String(i);
 
       const label = document.createElement('label');
@@ -138,6 +161,51 @@
       fileInput.className = 'file-input';
       fileInput.id = fileId;
       fileInput.addEventListener('change', (e) => onFileSelected(i, e));
+
+      // Each box takes an image or a flat palette color, whichever was set last.
+      const colorRow = document.createElement('div');
+      colorRow.className = 'color-row';
+
+      const swatch = document.createElement('span');
+      swatch.className = 'swatch';
+      if (panel && panel.color) {
+        swatch.style.background = panel.color;
+      } else {
+        swatch.classList.add('is-empty');
+      }
+
+      const colorSelect = document.createElement('select');
+      colorSelect.className = 'color-select';
+      colorSelect.id = `color-${i}`;
+      colorSelect.setAttribute('aria-label', `Fill color for image ${i + 1}`);
+
+      const noneOpt = document.createElement('option');
+      noneOpt.value = '';
+      noneOpt.textContent = 'Or pick a color';
+      colorSelect.appendChild(noneOpt);
+
+      const whiteOpt = document.createElement('option');
+      whiteOpt.value = WHITE;
+      whiteOpt.textContent = 'White';
+      colorSelect.appendChild(whiteOpt);
+
+      PALETTE.forEach(([rampName, hexes]) => {
+        const group = document.createElement('optgroup');
+        group.label = rampName;
+        hexes.forEach((hex, step) => {
+          const opt = document.createElement('option');
+          opt.value = hex;
+          opt.textContent = `${rampName} ${STEPS[step]}`;
+          group.appendChild(opt);
+        });
+        colorSelect.appendChild(group);
+      });
+
+      colorSelect.value = panel && panel.color ? panel.color : '';
+      colorSelect.addEventListener('change', (e) => onColorSelected(i, e.target.value));
+
+      colorRow.appendChild(colorSelect);
+      colorRow.appendChild(swatch);
 
       const zoomRow = document.createElement('div');
       zoomRow.className = 'zoom-row';
@@ -161,6 +229,7 @@
       zoomRow.appendChild(zoomSlider);
       slot.appendChild(label);
       slot.appendChild(fileInput);
+      slot.appendChild(colorRow);
       slot.appendChild(zoomRow);
       uploadRow.appendChild(slot);
     }
@@ -179,6 +248,14 @@
     };
     img.onerror = () => URL.revokeObjectURL(url);
     img.src = url;
+  }
+
+  // Picking a color replaces whatever was in the box; picking the blank
+  // option empties it again.
+  function onColorSelected(index, hex) {
+    panels[index] = hex ? { color: hex } : undefined;
+    buildUploadSlots();
+    render();
   }
 
   function clientToCanvas(clientX, clientY) {
