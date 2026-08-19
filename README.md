@@ -21,6 +21,20 @@ Builds split-image graphics for social/promo use:
 - Upload one image per panel; drag on the canvas to reposition, use each slot's zoom slider to scale.
 - Enter a file name and export as a single flattened JPG at full output resolution.
 
+### Editorial Templates (`/editorial-templates/`)
+
+A hub page collecting reusable layouts for recurring franchises and other editorial projects. Each template is a fixed, non-configurable layout so the same graphic comes out identically every time it's rebuilt.
+
+#### Trivia Tease Template (`/editorial-templates/trivia-tease/`)
+
+- 15-box split: 5 across × 3 down at 2400×1200, so every box is 480×400.
+- Layout and output size are fixed by design — there are no split or size options.
+- Upload one image per box; each is cover-fitted, drag on the canvas to reposition, use each slot's zoom slider to scale.
+- White dividers on every seam, matching the Split Image Generator.
+- Enter a file name and export as a single flattened JPG at full 2400×1200 resolution.
+
+New templates are added as subfolders here and linked from the hub page.
+
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
 
 ## Design

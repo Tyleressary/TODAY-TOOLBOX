@@ -1,0 +1,28 @@
+/* Page-local overrides. Shared tool-page shell lives in ../../assets/toolbox.css */
+
+/* Five across, mirroring the canvas grid, so slot N sits above box N. */
+.upload-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .upload-row {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+}
+
+#canvas {
+  width: 100%;
+  max-width: 1000px;
+  height: auto;
+  border-radius: 6px;
+  touch-action: none;
+  cursor: grab;
+  background: var(--gray-100);
+}
+
+#canvas:active {
+  cursor: grabbing;
+}
