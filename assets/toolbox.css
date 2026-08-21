@@ -288,6 +288,12 @@ a.tool-card:hover {
   border-color: var(--accent);
 }
 
+.upload-slot.drag-over {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: var(--bg);
+}
+
 .upload-slot label {
   font-size: 0.85rem;
   font-weight: 600;

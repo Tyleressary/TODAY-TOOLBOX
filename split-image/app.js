@@ -33,6 +33,7 @@
   let sizeMode = 'wide';
   let panels = []; // panels[i] = { img, scaleMultiplier, panX, panY } | undefined
   let dragState = null;
+  let dragHoverIndex = null; // panel index a file drag is currently over, if any
 
   function getDims() {
     return SIZES[sizeMode];
@@ -124,6 +125,21 @@
     }
   }
 
+  function drawDragHighlight(w, h, layout) {
+    if (dragHoverIndex === null) return;
+    const bbox = getPanelRect(dragHoverIndex, w, h, layout);
+    const bw = bbox.maxX - bbox.minX;
+    const bh = bbox.maxY - bbox.minY;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 81, 60, 0.25)';
+    ctx.fillRect(bbox.minX, bbox.minY, bw, bh);
+    ctx.strokeStyle = '#ff513c';
+    ctx.lineWidth = Math.max(3, w * 0.006);
+    ctx.setLineDash([w * 0.012, w * 0.008]);
+    ctx.strokeRect(bbox.minX + ctx.lineWidth / 2, bbox.minY + ctx.lineWidth / 2, bw - ctx.lineWidth, bh - ctx.lineWidth);
+    ctx.restore();
+  }
+
   function render() {
     const { w, h } = getDims();
     const layout = getLayout();
@@ -150,6 +166,7 @@
     }
 
     drawDividers(w, h, layout);
+    drawDragHighlight(w, h, layout);
   }
 
   function buildUploadSlots() {
@@ -196,13 +213,25 @@
       slot.appendChild(label);
       slot.appendChild(fileInput);
       slot.appendChild(zoomRow);
+
+      slot.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        slot.classList.add('drag-over');
+      });
+      slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+      slot.addEventListener('drop', (e) => {
+        e.preventDefault();
+        slot.classList.remove('drag-over');
+        loadImageIntoPanel(i, e.dataTransfer.files && e.dataTransfer.files[0]);
+      });
+
       uploadRow.appendChild(slot);
     }
   }
 
-  function onFileSelected(index, e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
+  function loadImageIntoPanel(index, file) {
+    if (index === null || index === undefined || !file || !file.type.startsWith('image/')) return;
     const img = new Image();
     img.onload = () => {
       panels[index] = { img, scaleMultiplier: 1, panX: 0, panY: 0 };
@@ -210,6 +239,10 @@
       render();
     };
     img.src = URL.createObjectURL(file);
+  }
+
+  function onFileSelected(index, e) {
+    loadImageIntoPanel(index, e.target.files && e.target.files[0]);
   }
 
   function setLayout(id) {
@@ -303,6 +336,45 @@
   }
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
+
+  function panelIndexAtClientPoint(clientX, clientY) {
+    const { w, h } = getDims();
+    const layout = getLayout();
+    const { x, y } = clientToCanvas(clientX, clientY);
+    for (let i = 0; i < layout.count; i++) {
+      if (pointInRect(x, y, getPanelRect(i, w, h, layout))) return i;
+    }
+    return null;
+  }
+
+  canvas.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    const hoverIndex = panelIndexAtClientPoint(e.clientX, e.clientY);
+    if (hoverIndex !== dragHoverIndex) {
+      dragHoverIndex = hoverIndex;
+      render();
+    }
+  });
+
+  canvas.addEventListener('dragleave', () => {
+    if (dragHoverIndex !== null) {
+      dragHoverIndex = null;
+      render();
+    }
+  });
+
+  canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const index = dragHoverIndex;
+    dragHoverIndex = null;
+    render();
+    loadImageIntoPanel(index, e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
+
+  // Fallback so a drop that misses every target doesn't navigate the page away.
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => e.preventDefault());
 
   downloadBtn.addEventListener('click', () => {
     const raw = filenameInput.value.trim() || 'split-image';
