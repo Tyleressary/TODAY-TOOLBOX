@@ -85,11 +85,17 @@
     ctx.textBaseline = 'alphabetic';
 
     let metrics = ctx.measureText(text);
+    // Use the actual glyph ink extents, not the advance width — a font's
+    // left/right side bearings are rarely equal, so measuring/centering by
+    // `metrics.width` alone leaves the underline (and the word itself)
+    // visibly off-center relative to where the letters actually start/end.
+    let inkWidth = metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight;
     const maxWidth = w * MAX_WIDTH_FRACTION;
-    if (metrics.width > maxWidth) {
-      fontSize *= maxWidth / metrics.width;
+    if (inkWidth > maxWidth) {
+      fontSize *= maxWidth / inkWidth;
       ctx.font = `900 ${fontSize}px ${FONT_STACK}`;
       metrics = ctx.measureText(text);
+      inkWidth = metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight;
     }
 
     const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.72;
@@ -101,11 +107,16 @@
     const blockTop = (h - blockHeight) / 2;
     const baselineY = blockTop + ascent;
 
+    // Shift the draw point so the ink (not the advance box) lands centered
+    // on the canvas: with textAlign 'center', drawing at this x puts the
+    // true left/right glyph edges at exactly w/2 -+ inkWidth/2.
+    const textX = w / 2 + (metrics.actualBoundingBoxLeft - metrics.actualBoundingBoxRight) / 2;
+
     ctx.fillStyle = wordColor;
-    ctx.fillText(text, w / 2, baselineY);
+    ctx.fillText(text, textX, baselineY);
 
     const lineY = baselineY + descent + underlineGap;
-    ctx.fillRect(w / 2 - metrics.width / 2, lineY, metrics.width, underlineThickness);
+    ctx.fillRect(w / 2 - inkWidth / 2, lineY, inkWidth, underlineThickness);
   }
 
   function setSizeMode(mode) {
