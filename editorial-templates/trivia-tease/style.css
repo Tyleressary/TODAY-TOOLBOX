@@ -27,6 +27,13 @@
   cursor: grabbing;
 }
 
+.hint {
+  margin: -10px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
 /* Color picker: sits under the file input so a box takes an image or a flat color. */
 .color-row {
   display: flex;

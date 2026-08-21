@@ -5,6 +5,7 @@
 
   const SIZES = {
     wide: { w: 2400, h: 1200 },
+    hd: { w: 1920, h: 1080 },
     square: { w: 1000, h: 1000 },
   };
 

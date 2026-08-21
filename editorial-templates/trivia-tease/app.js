@@ -35,6 +35,7 @@
   // a solid fill { color }, or undefined for an empty box.
   let panels = [];
   let dragState = null;
+  let dragHoverIndex = null; // box index a file drag is currently over, if any
 
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
@@ -116,6 +117,21 @@
     }
   }
 
+  function drawDragHighlight() {
+    if (dragHoverIndex === null) return;
+    const bbox = getPanelRect(dragHoverIndex);
+    const bw = bbox.maxX - bbox.minX;
+    const bh = bbox.maxY - bbox.minY;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 81, 60, 0.25)';
+    ctx.fillRect(bbox.minX, bbox.minY, bw, bh);
+    ctx.strokeStyle = '#ff513c';
+    ctx.lineWidth = Math.max(3, W * 0.006);
+    ctx.setLineDash([W * 0.012, W * 0.008]);
+    ctx.strokeRect(bbox.minX + ctx.lineWidth / 2, bbox.minY + ctx.lineWidth / 2, bw - ctx.lineWidth, bh - ctx.lineWidth);
+    ctx.restore();
+  }
+
   function render() {
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#f0f2f5';
@@ -139,6 +155,7 @@
     }
 
     drawDividers();
+    drawDragHighlight();
   }
 
   function buildUploadSlots() {
@@ -231,13 +248,25 @@
       slot.appendChild(fileInput);
       slot.appendChild(colorRow);
       slot.appendChild(zoomRow);
+
+      slot.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        slot.classList.add('drag-over');
+      });
+      slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+      slot.addEventListener('drop', (e) => {
+        e.preventDefault();
+        slot.classList.remove('drag-over');
+        loadImageIntoPanel(i, e.dataTransfer.files && e.dataTransfer.files[0]);
+      });
+
       uploadRow.appendChild(slot);
     }
   }
 
-  function onFileSelected(index, e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
+  function loadImageIntoPanel(index, file) {
+    if (index === null || index === undefined || !file || !file.type.startsWith('image/')) return;
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -248,6 +277,10 @@
     };
     img.onerror = () => URL.revokeObjectURL(url);
     img.src = url;
+  }
+
+  function onFileSelected(index, e) {
+    loadImageIntoPanel(index, e.target.files && e.target.files[0]);
   }
 
   // Picking a color replaces whatever was in the box; picking the blank
@@ -303,6 +336,43 @@
   }
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
+
+  function panelIndexAtClientPoint(clientX, clientY) {
+    const { x, y } = clientToCanvas(clientX, clientY);
+    for (let i = 0; i < COUNT; i++) {
+      if (pointInRect(x, y, getPanelRect(i))) return i;
+    }
+    return null;
+  }
+
+  canvas.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    const hoverIndex = panelIndexAtClientPoint(e.clientX, e.clientY);
+    if (hoverIndex !== dragHoverIndex) {
+      dragHoverIndex = hoverIndex;
+      render();
+    }
+  });
+
+  canvas.addEventListener('dragleave', () => {
+    if (dragHoverIndex !== null) {
+      dragHoverIndex = null;
+      render();
+    }
+  });
+
+  canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const index = dragHoverIndex;
+    dragHoverIndex = null;
+    render();
+    loadImageIntoPanel(index, e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
+
+  // Fallback so a drop that misses every target doesn't navigate the page away.
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => e.preventDefault());
 
   downloadBtn.addEventListener('click', () => {
     const raw = filenameInput.value.trim() || 'trivia-tease';
