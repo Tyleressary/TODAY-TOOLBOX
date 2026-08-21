@@ -37,6 +37,14 @@ A hub page collecting reusable layouts for recurring franchises and other editor
 - White dividers on every seam, matching the Split Image Generator.
 - Enter a file name and export as a single flattened JPG at full 2400×1200 resolution.
 
+#### Word Explain Template (`/editorial-templates/word-explain/`)
+
+- A single word (typed in, all-caps on render) centered on a solid background, with an underline in the same color spanning the word's rendered width.
+- Output size: 2400×1200 or 1000×1000 — no split options, since this is a single text panel.
+- Word is set in Mada Black (self-hosted at `assets/fonts/Mada-Black.ttf`), sized to a fixed fraction of the canvas height; if a longer word would overflow the safe margins at that size, the font shrinks just enough to fit — it never wraps or exceeds the canvas.
+- Word/underline color and background color are each an independent dropdown, same 36-color palette + white component used in Trivia Tease.
+- Enter a file name and export as a single flattened JPG at full output resolution.
+
 New templates are added as subfolders here and linked from the hub page.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).

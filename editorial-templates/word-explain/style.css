@@ -1,0 +1,18 @@
+/* Page-local overrides. Shared tool-page shell lives in ../../assets/toolbox.css */
+
+#wordInput {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.95rem;
+  min-width: 200px;
+}
+
+#canvas {
+  width: 100%;
+  max-width: 900px;
+  height: auto;
+  border-radius: 6px;
+}

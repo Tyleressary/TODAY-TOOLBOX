@@ -34,44 +34,6 @@
   text-align: center;
 }
 
-/* Color picker: sits under the file input so a box takes an image or a flat color. */
-.color-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.color-select {
-  flex: 1;
-  min-width: 0;
-  appearance: none;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 0.78rem;
-  padding: 6px 22px 6px 8px;
-  cursor: pointer;
-  /* chevron, so removing the native appearance doesn't lose the affordance */
-  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
-                    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
-  background-position: right 11px center, right 6px center;
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
-}
-
-.color-select:hover {
-  border-color: var(--text-dim);
-}
-
-.swatch {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-}
-
 .swatch.is-empty {
   border-style: dashed;
   background: var(--bg);
