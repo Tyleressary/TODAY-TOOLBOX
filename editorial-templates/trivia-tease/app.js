@@ -2,6 +2,10 @@
   'use strict';
 
   const MAX_ZOOM = 3;
+  // Fixed pixel stroke weight, matching the reference exports (measured at
+  // 12px on both a 2400px-wide and a 1200px-wide canvas — a flat weight,
+  // not a percentage of canvas width).
+  const DIVIDER_THICKNESS = 12;
 
   // Toolbox palette — six ramps, 100 (lightest) to 600 (most saturated).
   // Mirrors assets/toolbox.css :root and docs/color-palette.md.
@@ -102,7 +106,7 @@
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = Math.max(2, W * 0.0035);
+    ctx.lineWidth = DIVIDER_THICKNESS;
     ctx.stroke();
   }
 

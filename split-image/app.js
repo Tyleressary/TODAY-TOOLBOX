@@ -2,6 +2,10 @@
   'use strict';
 
   const MAX_ZOOM = 3;
+  // Fixed pixel stroke weight, matching the reference exports (measured at
+  // 12px on both a 2400px-wide and a 1200px-wide canvas — a flat weight,
+  // not a percentage of canvas width).
+  const DIVIDER_THICKNESS = 12;
 
   const SIZES = {
     wide: { w: 2400, h: 1200 },
@@ -100,28 +104,28 @@
     ctx.fillText(`Image ${index + 1}`, cx, cy);
   }
 
-  function strokeLine(x1, y1, x2, y2, w) {
+  function strokeLine(x1, y1, x2, y2) {
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = Math.max(2, w * 0.0035);
+    ctx.lineWidth = DIVIDER_THICKNESS;
     ctx.stroke();
   }
 
   function drawDividers(w, h, layout) {
     if (layout.orientation === 'grid') {
-      strokeLine(w / 2, 0, w / 2, h, w);
-      strokeLine(0, h / 2, w, h / 2, w);
+      strokeLine(w / 2, 0, w / 2, h);
+      strokeLine(0, h / 2, w, h / 2);
       return;
     }
     for (let i = 1; i < layout.count; i++) {
       if (layout.orientation === 'horizontal') {
         const y = (h * i) / layout.count;
-        strokeLine(0, y, w, y, w);
+        strokeLine(0, y, w, y);
       } else {
         const x = (w * i) / layout.count;
-        strokeLine(x, 0, x, h, w);
+        strokeLine(x, 0, x, h);
       }
     }
   }
