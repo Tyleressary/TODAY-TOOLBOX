@@ -25,6 +25,7 @@
   let corner = 'br';
   let photo = null; // { img, scaleMultiplier, panX, panY }
   let dragState = null;
+  let fileDragOver = false; // a file drag is hovering the canvas
 
   const logoImg = new Image();
   let logoReady = false;
@@ -99,6 +100,19 @@
     }
 
     drawLogo();
+    drawDragHighlight();
+  }
+
+  function drawDragHighlight() {
+    if (!fileDragOver) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 81, 60, 0.18)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#ff513c';
+    ctx.lineWidth = Math.max(4, W * 0.006);
+    ctx.setLineDash([W * 0.02, W * 0.012]);
+    ctx.strokeRect(ctx.lineWidth, ctx.lineWidth, W - ctx.lineWidth * 2, H - ctx.lineWidth * 2);
+    ctx.restore();
   }
 
   function buildUploadSlot() {
@@ -135,6 +149,18 @@
       }
     });
 
+    slot.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      slot.classList.add('drag-over');
+    });
+    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+    slot.addEventListener('drop', (e) => {
+      e.preventDefault();
+      slot.classList.remove('drag-over');
+      loadFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+    });
+
     zoomRow.appendChild(zoomLabel);
     zoomRow.appendChild(zoomSlider);
     slot.appendChild(label);
@@ -145,7 +171,11 @@
 
   function onFileSelected(e) {
     const file = e.target.files && e.target.files[0];
-    if (!file) return;
+    if (file) loadFile(file);
+  }
+
+  function loadFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -210,6 +240,21 @@
   }
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
+
+  canvas.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!fileDragOver) { fileDragOver = true; render(); }
+  });
+  canvas.addEventListener('dragleave', () => {
+    if (fileDragOver) { fileDragOver = false; render(); }
+  });
+  canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    fileDragOver = false;
+    loadFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+    render();
+  });
 
   downloadBtn.addEventListener('click', () => {
     const raw = filenameInput.value.trim() || 'today-vault';
