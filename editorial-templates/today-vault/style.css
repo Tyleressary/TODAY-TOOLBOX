@@ -1,0 +1,22 @@
+/* Page-local overrides. Shared tool-page shell lives in ../../assets/toolbox.css */
+
+/* One image for the whole frame, so a single slot rather than a grid. */
+.upload-row {
+  display: grid;
+  grid-template-columns: minmax(0, 320px);
+  gap: 14px;
+}
+
+#canvas {
+  width: 100%;
+  max-width: 1000px;
+  height: auto;
+  border-radius: 6px;
+  touch-action: none;
+  cursor: grab;
+  background: var(--gray-100);
+}
+
+#canvas:active {
+  cursor: grabbing;
+}

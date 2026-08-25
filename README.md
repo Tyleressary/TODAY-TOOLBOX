@@ -36,6 +36,16 @@ A hub page collecting reusable layouts for recurring franchises and other editor
 - White dividers on every seam, matching the Split Image Generator.
 - Enter a file name and export as a single flattened JPG at full 2400×1200 resolution.
 
+#### TODAY VAULT Template (`/editorial-templates/today-vault/`)
+
+- Single image at 2400×1200 with the TODAY VAULT badge composited over it.
+- Upload one image; it is cover-fitted to the frame, drag to reposition and use the zoom slider to scale.
+- Badge corner: bottom-left or bottom-right (bottom-right by default, matching the reference example).
+- The badge is fixed — its size and position come only from constants and the chosen corner, and it has no hit test, so dragging always moves the photo underneath and never the logo.
+- Badge geometry was measured from the supplied reference: 24% of canvas height (288px), inset 3% of width from the side and 7.5% of height from the bottom. Stored as fractions so it stays correct if the canvas size changes.
+- Artwork lives at `assets/today-vault-logo.png`, pre-trimmed to its alpha bounds and downscaled to 576px (2× the render size).
+- Enter a file name and export as a single flattened JPG at full 2400×1200 resolution.
+
 New templates are added as subfolders here and linked from the hub page.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
