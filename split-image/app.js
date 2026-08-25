@@ -2,9 +2,14 @@
   'use strict';
 
   const MAX_ZOOM = 3;
+  // Fixed pixel stroke weight, matching the reference exports (measured at
+  // 12px on both a 2400px-wide and a 1200px-wide canvas — a flat weight,
+  // not a percentage of canvas width).
+  const DIVIDER_THICKNESS = 12;
 
   const SIZES = {
     wide: { w: 2400, h: 1200 },
+    hd: { w: 1920, h: 1080 },
     square: { w: 1000, h: 1000 },
   };
 
@@ -33,6 +38,7 @@
   let sizeMode = 'wide';
   let panels = []; // panels[i] = { img, scaleMultiplier, panX, panY } | undefined
   let dragState = null;
+  let dragHoverIndex = null; // panel index a file drag is currently over, if any
 
   function getDims() {
     return SIZES[sizeMode];
@@ -98,30 +104,45 @@
     ctx.fillText(`Image ${index + 1}`, cx, cy);
   }
 
-  function strokeLine(x1, y1, x2, y2, w) {
+  function strokeLine(x1, y1, x2, y2) {
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = Math.max(2, w * 0.0035);
+    ctx.lineWidth = DIVIDER_THICKNESS;
     ctx.stroke();
   }
 
   function drawDividers(w, h, layout) {
     if (layout.orientation === 'grid') {
-      strokeLine(w / 2, 0, w / 2, h, w);
-      strokeLine(0, h / 2, w, h / 2, w);
+      strokeLine(w / 2, 0, w / 2, h);
+      strokeLine(0, h / 2, w, h / 2);
       return;
     }
     for (let i = 1; i < layout.count; i++) {
       if (layout.orientation === 'horizontal') {
         const y = (h * i) / layout.count;
-        strokeLine(0, y, w, y, w);
+        strokeLine(0, y, w, y);
       } else {
         const x = (w * i) / layout.count;
-        strokeLine(x, 0, x, h, w);
+        strokeLine(x, 0, x, h);
       }
     }
+  }
+
+  function drawDragHighlight(w, h, layout) {
+    if (dragHoverIndex === null) return;
+    const bbox = getPanelRect(dragHoverIndex, w, h, layout);
+    const bw = bbox.maxX - bbox.minX;
+    const bh = bbox.maxY - bbox.minY;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 81, 60, 0.25)';
+    ctx.fillRect(bbox.minX, bbox.minY, bw, bh);
+    ctx.strokeStyle = '#ff513c';
+    ctx.lineWidth = Math.max(3, w * 0.006);
+    ctx.setLineDash([w * 0.012, w * 0.008]);
+    ctx.strokeRect(bbox.minX + ctx.lineWidth / 2, bbox.minY + ctx.lineWidth / 2, bw - ctx.lineWidth, bh - ctx.lineWidth);
+    ctx.restore();
   }
 
   function render() {
@@ -150,6 +171,7 @@
     }
 
     drawDividers(w, h, layout);
+    drawDragHighlight(w, h, layout);
   }
 
   function buildUploadSlots() {
@@ -196,13 +218,25 @@
       slot.appendChild(label);
       slot.appendChild(fileInput);
       slot.appendChild(zoomRow);
+
+      slot.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        slot.classList.add('drag-over');
+      });
+      slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+      slot.addEventListener('drop', (e) => {
+        e.preventDefault();
+        slot.classList.remove('drag-over');
+        loadImageIntoPanel(i, e.dataTransfer.files && e.dataTransfer.files[0]);
+      });
+
       uploadRow.appendChild(slot);
     }
   }
 
-  function onFileSelected(index, e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
+  function loadImageIntoPanel(index, file) {
+    if (index === null || index === undefined || !file || !file.type.startsWith('image/')) return;
     const img = new Image();
     img.onload = () => {
       panels[index] = { img, scaleMultiplier: 1, panX: 0, panY: 0 };
@@ -210,6 +244,10 @@
       render();
     };
     img.src = URL.createObjectURL(file);
+  }
+
+  function onFileSelected(index, e) {
+    loadImageIntoPanel(index, e.target.files && e.target.files[0]);
   }
 
   function setLayout(id) {
@@ -303,6 +341,45 @@
   }
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
+
+  function panelIndexAtClientPoint(clientX, clientY) {
+    const { w, h } = getDims();
+    const layout = getLayout();
+    const { x, y } = clientToCanvas(clientX, clientY);
+    for (let i = 0; i < layout.count; i++) {
+      if (pointInRect(x, y, getPanelRect(i, w, h, layout))) return i;
+    }
+    return null;
+  }
+
+  canvas.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    const hoverIndex = panelIndexAtClientPoint(e.clientX, e.clientY);
+    if (hoverIndex !== dragHoverIndex) {
+      dragHoverIndex = hoverIndex;
+      render();
+    }
+  });
+
+  canvas.addEventListener('dragleave', () => {
+    if (dragHoverIndex !== null) {
+      dragHoverIndex = null;
+      render();
+    }
+  });
+
+  canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const index = dragHoverIndex;
+    dragHoverIndex = null;
+    render();
+    loadImageIntoPanel(index, e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
+
+  // Fallback so a drop that misses every target doesn't navigate the page away.
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => e.preventDefault());
 
   downloadBtn.addEventListener('click', () => {
     const raw = filenameInput.value.trim() || 'split-image';

@@ -19,3 +19,10 @@
 #canvas:active {
   cursor: grabbing;
 }
+
+.hint {
+  margin: -10px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  text-align: center;
+}
