@@ -119,13 +119,15 @@
   text-transform: uppercase;
 }
 
-/* "start TODAY" lockup, recolored so it can take any palette color. Artwork: assets/start-today-logo-mask.png (106 x 63). */
+/* "start TODAY" lockup, recolored so it can take any palette color.
+   Artwork: assets/start-today-logo-mask.png (848 x 507, 8x this box),
+   built from the supplied high-resolution Start TODAY logo files. */
 .tcal-logo {
   position: absolute;
   left: 663px;
   top: 18px;
   width: 106px;
-  height: 63px;
+  height: 63.4px;
   background: var(--cal-logo);
   -webkit-mask: url('../../assets/start-today-logo-mask.png') center / 100% 100% no-repeat;
   mask: url('../../assets/start-today-logo-mask.png') center / 100% 100% no-repeat;
