@@ -1,0 +1,298 @@
+/*
+ * TODAY calendar component — visual design.
+ *
+ * Every measurement below is in DESIGN PIXELS on a fixed 792 x 612 artboard
+ * (US Letter landscape at 72dpi — the size of the supplied reference
+ * exports) and was measured from those references. The artboard is scaled
+ * as a whole by calendar.js to fit its container, so proportions never
+ * distort. Change a number here and every calendar picks it up.
+ *
+ * Colors come from --cal-* custom properties set per calendar by
+ * calendar.js (see COLOR_ROLES in calendar-data.js).
+ */
+
+@font-face {
+  font-family: 'Mada';
+  src: url('../../assets/fonts/Mada-Variable-latin.woff2') format('woff2');
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: block;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Mada';
+  src: url('../../assets/fonts/Mada-Variable-latin-ext.woff2') format('woff2');
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: block;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Responsive wrapper: holds the artboard's aspect ratio at any width. */
+.tcal-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 792 / 612;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* The artboard. calendar.js sets --tcal-scale = frame width / 792. */
+.tcal {
+  /* default colors = purple reference; overridden inline per calendar */
+  --cal-background: #F3F0F2;
+  --cal-header: #CB9AB4;
+  --cal-headerText: #FFFFFF;
+  --cal-logo: #CB9AB4;
+  --cal-band: #CB9AB4;
+  --cal-bandText: #FFFFFF;
+  --cal-cell: #FFFFFF;
+  --cal-cellText: #CB9AB4;
+
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 792px;
+  height: 612px;
+  transform-origin: 0 0;
+  transform: scale(var(--tcal-scale, 1));
+  overflow: hidden;
+  background: var(--cal-background);
+  font-family: 'Mada', sans-serif;
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* Self-contained: don't rely on page-level resets (the JPG export embeds
+   only this stylesheet). */
+.tcal,
+.tcal *,
+.tcal *::before,
+.tcal *::after {
+  box-sizing: border-box;
+}
+
+/* ---- Header -------------------------------------------------------- */
+
+/* Banner: 652 x 91, bottom-right corner is a 90px quarter circle. */
+.tcal-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 652px;
+  height: 91px;
+  background: var(--cal-header);
+  border-bottom-right-radius: 90px;
+}
+
+/* "NOVEMBER 2023 CHALLENGE" — cap height 9px, top of caps at y=18. */
+.tcal-eyebrow {
+  position: absolute;
+  left: 31px;
+  top: 13px;
+  margin: 0;
+  max-width: 560px;
+  white-space: nowrap;
+  color: var(--cal-headerText);
+  font-size: 13.4px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0.163em;
+  text-transform: uppercase;
+}
+
+/* "31-DAY WALKING STREAK" — cap height 30px, caps span y=37..68.
+   calendar.js narrows the size only if a longer headline would run into
+   the banner's curve. */
+.tcal-headline {
+  position: absolute;
+  left: 31px;
+  top: 28px;
+  margin: 0;
+  white-space: nowrap;
+  color: var(--cal-headerText);
+  font-size: 46px;
+  line-height: 52px;
+  font-weight: 900;
+  letter-spacing: 0.051em;
+  text-transform: uppercase;
+}
+
+/* "start TODAY" lockup, recolored so it can take any palette color. Artwork: assets/start-today-logo-mask.png (106 x 63). */
+.tcal-logo {
+  position: absolute;
+  left: 663px;
+  top: 18px;
+  width: 106px;
+  height: 63px;
+  background: var(--cal-logo);
+  -webkit-mask: url('../../assets/start-today-logo-mask.png') center / 100% 100% no-repeat;
+  mask: url('../../assets/start-today-logo-mask.png') center / 100% 100% no-repeat;
+}
+
+/* calendar.js swaps the mask for a pre-tinted <img> (prints cleanly in
+   PDFs); the mask above is the fallback, e.g. when opened from file://. */
+.tcal-logo.has-img {
+  background: none;
+  -webkit-mask: none;
+  mask: none;
+}
+
+.tcal-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Grid ------------------------------------------------------------ */
+
+/* 7 columns of 91px with 18px gutters (x = 23..768); rows are 89px tall
+   with 11px between them (100px pitch), starting at y = 106. */
+.tcal-grid {
+  position: absolute;
+  left: 23px;
+  top: 106px;
+  display: grid;
+  grid-template-columns: repeat(7, 91px);
+  grid-auto-rows: 89px;
+  column-gap: 18px;
+  row-gap: 11px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tcal-cell {
+  display: flex;
+  flex-direction: column;
+  width: 91px;
+  height: 89px;
+}
+
+/* Domed day tab: 30px tall, top edge is a half-ellipse spanning the full
+   cell width. */
+.tcal-band {
+  flex: 0 0 30px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 9px;
+  background: var(--cal-band);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  color: var(--cal-bandText);
+  font-size: 11.5px;
+  line-height: 11px;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The trailing letter-space would push the label off-center. */
+.tcal-day {
+  margin-right: -0.17em;
+}
+
+/* White cell body: 91 x 59. */
+.tcal-body {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
+  background: var(--cal-cell);
+  overflow: hidden;
+}
+
+/* Cell text. The font-size here is the DEFAULT size for every cell;
+   calendar.js lowers the inline font-size on a single cell only when its
+   text would need more than ~3 lines (see FIT in calendar.js for the
+   minimum). 3 lines x 16px x 1.1 fits the 53px inner body height. */
+.tcal-text {
+  width: 100%;
+  max-height: 100%;
+  color: var(--cal-cellText);
+  font-size: 16px;
+  line-height: 1.1;
+  font-weight: 350;
+  letter-spacing: -0.02em;
+  word-spacing: 0.08em;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  transform: translateY(-1.5px); /* optical centering, per reference */
+}
+
+/* Last resort at the minimum size: break inside long words. */
+.tcal-text.is-breaking {
+  overflow-wrap: anywhere;
+}
+
+/* Checkbox circle — 10px outlined ring before the first word. Sized in em
+   so it shrinks along with a fitted cell. */
+.tcal.has-checkbox .tcal-text::before {
+  content: '';
+  display: inline-block;
+  box-sizing: border-box;
+  width: 0.62em;
+  height: 0.62em;
+  margin-right: 0.45em;
+  border: 0.1em solid currentColor;
+  border-radius: 50%;
+  vertical-align: -0.02em;
+}
+
+.tcal.has-checkbox .tcal-text.is-empty::before {
+  margin-right: 0;
+}
+
+.tcal-cell.is-hidden {
+  visibility: hidden;
+}
+
+/* ---- Edit mode ------------------------------------------------------- */
+/* Only visible while editing; view mode shows the bare design. */
+
+.tcal.is-editing [contenteditable] {
+  cursor: text;
+  outline: none;
+  border-radius: 2px;
+  transition: box-shadow 0.12s ease;
+}
+
+.tcal.is-editing [contenteditable]:hover {
+  box-shadow: 0 0 0 1px rgba(54, 59, 67, 0.35);
+}
+
+.tcal.is-editing [contenteditable]:focus {
+  box-shadow: 0 0 0 1.5px #4ACAF1;
+}
+
+.tcal.is-editing .tcal-eyebrow [contenteditable]:empty,
+.tcal.is-editing .tcal-headline:empty {
+  display: inline-block;
+  min-width: 1.5em;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+/* Text couldn't fit even at the minimum size — flag it for the editor. */
+.tcal.is-editing .tcal-body.is-overflowing {
+  box-shadow: inset 0 0 0 1.5px #FC705F;
+}
+
+/* ---- Print: one calendar per US Letter landscape page ---------------- */
+@media print {
+  .tcal-frame {
+    width: 11in;
+    height: 8.5in;
+    aspect-ratio: auto;
+  }
+  .tcal {
+    transform: scale(1.33333) !important;
+  }
+}

@@ -55,6 +55,18 @@ A hub page collecting reusable layouts for recurring franchises and other editor
 - Artwork lives at `assets/today-vault-logo.png`, pre-trimmed to its alpha bounds and downscaled to 576px (2× the render size).
 - Enter a file name and export as a single flattened JPG at full 2400×1200 resolution.
 
+#### Challenge Calendar Template (`/editorial-templates/calendar/`)
+
+- Recreates the "31-Day Walking Streak" Start TODAY calendar exports: a 792×612 artboard (US Letter landscape), measured from the reference files and scaled as a whole so proportions never distort at any screen width.
+- All text is set in Mada (variable weight, self-hosted at `assets/fonts/Mada-Variable-*.woff2`, OFL license alongside).
+- **View / Edit mode** toggle. In Edit mode, click the headline, month, year, "Challenge", or any day box to type directly on the calendar; a settings panel appears with tabs for content, color themes, custom colors, and import/export. View mode shows the bare design.
+- Day boxes all use the same default size (16px on the artboard). A box whose text would need more than 3 lines shrinks — that box only — down to an 8px minimum; the box itself never resizes. A box that still can't fit is outlined red in Edit mode.
+- Colors are limited to the approved palette sampled from the references (five accents, their five tints, and white). "Color themes" reproduces each reference combination; "Custom colors" sets each part (background, banner, headline text, logo, day tab, tab text, cell, cell text) individually.
+- 1–35 days (7 columns × up to 5 rows); "Match month" sets the count from the month/year shown.
+- Calendars save automatically in the browser (localStorage). Use the Calendar menu to switch, **+ New** to start from a preset, **Duplicate** to spin off a new month, and Import/Export `.json` to share with teammates.
+- Export as a 2376×1836 JPG (3×), or Print / Save as PDF (one Letter-landscape page).
+- Code: `calendar-data.js` (palette, themes, presets, data defaults), `calendar.js` (the reusable `TodayCalendar` component), `calendar.css` (the design), `app.js` (page controls). To ship a new ready-made calendar to everyone, add an entry to `PRESETS` in `calendar-data.js`.
+
 New templates are added as subfolders here and linked from the hub page.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
