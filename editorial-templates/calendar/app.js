@@ -1,144 +1,67 @@
 /*
  * Challenge Calendar page controller.
  *
- * Owns everything around the calendar component: the saved-calendar
- * library (localStorage), View/Edit mode, the settings tabs, color
- * controls, JSON import/export, JPG download and printing. The calendar
+ * Owns everything around the calendar component: saving the working
+ * calendar in this browser (localStorage), the settings tabs, color
+ * controls and the JPG download. The calendar
  * itself is rendered by TodayCalendar (calendar.js) from plain data built
  * by CalendarData.createCalendar (calendar-data.js).
  */
 (() => {
   'use strict';
 
-  const { PALETTE, COLOR_ROLES, THEMES, PRESETS, createCalendar, clampDays, daysInMonth, newId } = window.CalendarData;
-  const STORAGE_KEY = 'today-toolbox.calendars.v1';
+  const { PALETTE, COLOR_ROLES, THEMES, createCalendar, clampDays, daysInMonth } = window.CalendarData;
+  const STORAGE_KEY = 'today-toolbox.calendar.v2';
   const EXPORT_SCALE = 3; // JPG = 2376 x 1836 (3x the 792 x 612 artboard)
 
   const $ = (id) => document.getElementById(id);
-  const calendarSelect = $('calendarSelect');
-  const newSelect = $('newSelect');
-  const modeGroup = $('modeGroup');
   const nameInput = $('nameInput');
   const daysInput = $('daysInput');
   const dayLabelInput = $('dayLabelInput');
-  const checkboxInput = $('checkboxInput');
   const fillInput = $('fillInput');
   const themeList = $('themeList');
   const roleList = $('roleList');
   const filenameInput = $('filename');
 
-  /* ---------- library (saved in this browser) ---------- */
+  /* ---------- the working calendar (saved in this browser) ---------- */
 
-  let library = loadLibrary();
-  let current = library.calendars.find((c) => c.id === library.currentId) || library.calendars[0];
+  let current = load();
 
-  function loadLibrary() {
+  function load() {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (saved && Array.isArray(saved.calendars) && saved.calendars.length) {
-        // Re-run through createCalendar so older saves gain any new fields.
-        saved.calendars = saved.calendars.map((c) => createCalendar(c));
-        return saved;
-      }
+      // Re-run through createCalendar so older saves gain any new fields.
+      if (saved && typeof saved === 'object') return createCalendar(saved);
     } catch (e) { /* storage unavailable or corrupt: start fresh */ }
-    const first = fromPreset(PRESETS[0]);
-    return { calendars: [first], currentId: first.id };
+    return createCalendar();
+  }
+
+  function writeNow() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(current)); } catch (e) { /* ignore */ }
   }
 
   let saveTimer = null;
   function save() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      library.currentId = current.id;
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(library)); } catch (e) { /* ignore */ }
-    }, 250);
+    saveTimer = setTimeout(() => { saveTimer = null; writeNow(); }, 250);
   }
 
   // Don't lose the last keystrokes if the tab closes inside the debounce.
   window.addEventListener('pagehide', () => {
-    if (!saveTimer) return;
-    clearTimeout(saveTimer);
-    library.currentId = current.id;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(library)); } catch (e) { /* ignore */ }
+    if (saveTimer) { clearTimeout(saveTimer); writeNow(); }
   });
 
-  function fromPreset(preset) {
-    const { presetId, ...rest } = preset;
-    return createCalendar({ ...rest, id: newId() });
-  }
-
-  /* ---------- calendar component ---------- */
+  /* ---------- calendar component (always editable) ---------- */
 
   const calendar = new window.TodayCalendar($('calendar'), current, {
-    onChange() { save(); },
+    onChange() {
+      // Keep the name field in step when the headline is typed on the calendar.
+      if (document.activeElement !== nameInput) nameInput.value = current.headline;
+      filenameInput.placeholder = defaultFilename();
+      save();
+    },
   });
-
-  function show(cal) {
-    current = cal;
-    calendar.setData(cal);
-    syncControls();
-    save();
-  }
-
-  /* ---------- library controls ---------- */
-
-  function renderCalendarSelect() {
-    calendarSelect.replaceChildren(...library.calendars.map((c) => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.name;
-      return opt;
-    }));
-    calendarSelect.value = current.id;
-  }
-
-  PRESETS.forEach((p, i) => {
-    const opt = document.createElement('option');
-    opt.value = String(i);
-    opt.textContent = p.name;
-    newSelect.appendChild(opt);
-  });
-
-  calendarSelect.addEventListener('change', () => {
-    show(library.calendars.find((c) => c.id === calendarSelect.value));
-  });
-
-  newSelect.addEventListener('change', () => {
-    if (newSelect.value === '') return;
-    const cal = fromPreset(PRESETS[Number(newSelect.value)]);
-    newSelect.value = '';
-    library.calendars.push(cal);
-    show(cal);
-    setMode('edit');
-  });
-
-  $('duplicateBtn').addEventListener('click', () => {
-    const copy = createCalendar({ ...JSON.parse(JSON.stringify(current)), id: newId(), name: current.name + ' copy' });
-    library.calendars.push(copy);
-    show(copy);
-  });
-
-  $('deleteBtn').addEventListener('click', () => {
-    if (!confirm(`Delete "${current.name}"? This can't be undone.`)) return;
-    library.calendars = library.calendars.filter((c) => c !== current);
-    if (!library.calendars.length) library.calendars.push(fromPreset(PRESETS[0]));
-    show(library.calendars[0]);
-  });
-
-  /* ---------- View / Edit mode ---------- */
-
-  function setMode(mode) {
-    const editing = mode === 'edit';
-    calendar.setEditing(editing);
-    document.body.classList.toggle('is-edit-mode', editing);
-    document.body.classList.toggle('is-view-mode', !editing);
-    modeGroup.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
-  }
-
-  modeGroup.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-mode]');
-    if (btn) setMode(btn.dataset.mode);
-  });
+  calendar.setEditing(true);
 
   /* ---------- settings tabs ---------- */
 
@@ -154,9 +77,11 @@
 
   /* ---------- Content tab ---------- */
 
+  // The calendar's name is its headline — editable here or on the calendar.
   nameInput.addEventListener('input', () => {
-    current.name = nameInput.value.trim() || 'Untitled calendar';
-    renderCalendarSelect();
+    current.headline = nameInput.value;
+    calendar.render();
+    filenameInput.placeholder = defaultFilename();
     save();
   });
 
@@ -181,12 +106,6 @@
 
   dayLabelInput.addEventListener('input', () => {
     current.dayLabel = dayLabelInput.value;
-    calendar.render();
-    save();
-  });
-
-  checkboxInput.addEventListener('change', () => {
-    current.showCheckbox = checkboxInput.checked;
     calendar.render();
     save();
   });
@@ -250,36 +169,12 @@
     roleList.appendChild(row);
   });
 
-  /* ---------- Import / export ---------- */
-
-  $('exportJsonBtn').addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(current, null, 2)], { type: 'application/json' });
-    downloadBlob(blob, slug(current.name) + '.json');
-  });
-
-  $('importJsonInput').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
-    try {
-      const parsed = JSON.parse(await file.text());
-      const list = Array.isArray(parsed) ? parsed : [parsed];
-      const imported = list.map((c) => createCalendar({ ...c, id: newId() }));
-      library.calendars.push(...imported);
-      show(imported[0]);
-    } catch (err) {
-      alert('That file isn\'t a valid calendar export.');
-    }
-  });
-
   /* ---------- sync controls from data ---------- */
 
   function syncControls() {
-    renderCalendarSelect();
-    nameInput.value = current.name;
+    nameInput.value = current.headline;
     daysInput.value = current.days;
     dayLabelInput.value = current.dayLabel;
-    checkboxInput.checked = current.showCheckbox !== false;
     roleList.querySelectorAll('.swatch-btn').forEach((b) => {
       const on = (current.colors[b.dataset.role] || '').toUpperCase() === b.dataset.hex;
       b.classList.toggle('active', on);
@@ -289,7 +184,7 @@
       const t = THEMES[b.dataset.theme].colors;
       b.classList.toggle('active', Object.keys(t).every((k) => t[k].toUpperCase() === (current.colors[k] || '').toUpperCase()));
     });
-    filenameInput.placeholder = slug(current.name);
+    filenameInput.placeholder = defaultFilename();
   }
 
   /* ---------- JPG download ---------- */
@@ -305,7 +200,7 @@
       downloadBlob(blob, (filenameInput.value.trim() || filenameInput.placeholder || 'challenge-calendar') + '.jpg');
     } catch (err) {
       console.error(err);
-      alert('This browser couldn\'t export the image. Use "Print / Save as PDF" instead, or try Chrome.');
+      alert('This browser couldn\'t export the image. Try the latest Chrome or Edge.');
     } finally {
       btn.disabled = false;
     }
@@ -316,7 +211,6 @@
     if (inlinedCss) return inlinedCss;
     const cssUrl = new URL('calendar.css', location.href);
     let css = await (await fetch(cssUrl)).text();
-    css = css.replace(/@media print\s*\{[\s\S]*?\}\s*\}/, '');
     const urls = [...new Set([...css.matchAll(/url\('([^']+)'\)/g)].map((m) => m[1]))];
     for (const u of urls) {
       const blob = await (await fetch(new URL(u, cssUrl))).blob();
@@ -359,15 +253,6 @@
     });
   }
 
-  /* ---------- print ---------- */
-
-  $('printBtn').addEventListener('click', () => {
-    const wasEditing = document.body.classList.contains('is-edit-mode');
-    setMode('view');
-    window.print();
-    if (wasEditing) setMode('edit');
-  });
-
   /* ---------- helpers ---------- */
 
   function downloadBlob(blob, filename) {
@@ -393,10 +278,13 @@
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function defaultFilename() {
+    return slug(`${current.month} ${current.year} ${current.headline}`);
+  }
+
   function slug(s) {
     return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'challenge-calendar';
   }
 
   syncControls();
-  setMode('view');
 })();

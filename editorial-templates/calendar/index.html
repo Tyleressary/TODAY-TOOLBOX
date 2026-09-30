@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="calendar.css">
 <link rel="stylesheet" href="style.css">
 </head>
-<body class="is-view-mode">
+<body>
   <header class="site-header tool-header">
     <a class="back-link" href="../index.html">&larr; Editorial Templates</a>
     <img src="../../assets/logo.png?v=3" alt="TODAY" class="site-logo">
@@ -17,47 +17,24 @@
   </header>
 
   <main class="tool-main">
-    <!-- Calendar library + mode switch -->
-    <section class="layout-panel cal-toolbar" aria-label="Calendars">
-      <div class="control-group">
-        <label class="control-label" for="calendarSelect">Calendar</label>
-        <div class="toolbar-row">
-          <select id="calendarSelect" class="cal-select"></select>
-          <select id="newSelect" class="cal-select" aria-label="New calendar">
-            <option value="">+ New&hellip;</option>
-          </select>
-          <button type="button" class="ghost-btn" id="duplicateBtn">Duplicate</button>
-          <button type="button" class="ghost-btn danger" id="deleteBtn">Delete</button>
-        </div>
-      </div>
-      <div class="control-group mode-group">
-        <span class="control-label">Mode</span>
-        <div class="segmented" id="modeGroup">
-          <button type="button" data-mode="view" class="active">View</button>
-          <button type="button" data-mode="edit">Edit</button>
-        </div>
-      </div>
-    </section>
-
-    <p class="edit-hint edit-only">Click any text on the calendar &mdash; headline, month, year, &ldquo;Challenge&rdquo;, or a day box &mdash; to edit it in place. Long day-box text shrinks to fit that box only.</p>
+    <p class="edit-hint">Click any text on the calendar &mdash; headline, month, year, &ldquo;Challenge&rdquo;, or a day box &mdash; to edit it in place. Long day-box text shrinks to fit that box only.</p>
 
     <section class="canvas-wrap cal-stage">
       <div id="calendar" class="cal-host"></div>
     </section>
 
-    <!-- Settings: only shown in Edit mode -->
-    <section class="settings-panel edit-only" aria-label="Calendar settings">
+    <!-- Settings -->
+    <section class="settings-panel" aria-label="Calendar settings">
       <div class="tabs" role="tablist">
         <button type="button" role="tab" class="tab active" data-tab="content" aria-selected="true">Content</button>
         <button type="button" role="tab" class="tab" data-tab="theme" aria-selected="false">Color themes</button>
         <button type="button" role="tab" class="tab" data-tab="colors" aria-selected="false">Custom colors</button>
-        <button type="button" role="tab" class="tab" data-tab="share" aria-selected="false">Import / export</button>
       </div>
 
       <div class="tab-panel" data-panel="content" role="tabpanel">
         <div class="field-grid">
           <label class="field">
-            <span class="control-label">Calendar name (library only)</span>
+            <span class="control-label">Calendar name</span>
             <input type="text" id="nameInput" autocomplete="off">
           </label>
           <label class="field">
@@ -70,10 +47,6 @@
           <label class="field">
             <span class="control-label">Day tab label</span>
             <input type="text" id="dayLabelInput" autocomplete="off" maxlength="12">
-          </label>
-          <label class="field field-check">
-            <input type="checkbox" id="checkboxInput">
-            <span>Show checkbox circle in day boxes</span>
           </label>
         </div>
         <div class="bulk-row">
@@ -95,20 +68,12 @@
         <div class="role-list" id="roleList"></div>
       </div>
 
-      <div class="tab-panel" data-panel="share" role="tabpanel" hidden>
-        <p class="panel-note">Calendars are saved automatically in this browser. Export a calendar as a .json file to back it up or share it with a teammate, who can import it here.</p>
-        <div class="toolbar-row">
-          <button type="button" class="ghost-btn" id="exportJsonBtn">Export .json</button>
-          <label class="ghost-btn file-btn">Import .json<input type="file" id="importJsonInput" accept="application/json,.json" hidden></label>
-        </div>
-      </div>
     </section>
 
     <section class="export-panel" aria-label="Export">
       <label for="filename">File name</label>
       <input id="filename" type="text" placeholder="challenge-calendar" autocomplete="off">
       <button type="button" id="downloadBtn">Download JPG</button>
-      <button type="button" id="printBtn" class="secondary-btn">Print / Save as PDF</button>
     </section>
   </main>
 

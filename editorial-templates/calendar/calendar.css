@@ -62,8 +62,6 @@
   font-family: 'Mada', sans-serif;
   font-kerning: normal;
   -webkit-font-smoothing: antialiased;
-  print-color-adjust: exact;
-  -webkit-print-color-adjust: exact;
 }
 
 /* Self-contained: don't rely on page-level resets (the JPG export embeds
@@ -133,8 +131,9 @@
   mask: url('../../assets/start-today-logo-mask.png') center / 100% 100% no-repeat;
 }
 
-/* calendar.js swaps the mask for a pre-tinted <img> (prints cleanly in
-   PDFs); the mask above is the fallback, e.g. when opened from file://. */
+/* calendar.js swaps the mask for a pre-tinted <img> (renders cleanly in
+   every export); the mask above is the fallback, e.g. when opened from
+   file://. */
 .tcal-logo.has-img {
   background: none;
   -webkit-mask: none;
@@ -233,24 +232,6 @@
   overflow-wrap: anywhere;
 }
 
-/* Checkbox circle — 10px outlined ring before the first word. Sized in em
-   so it shrinks along with a fitted cell. */
-.tcal.has-checkbox .tcal-text::before {
-  content: '';
-  display: inline-block;
-  box-sizing: border-box;
-  width: 0.62em;
-  height: 0.62em;
-  margin-right: 0.45em;
-  border: 0.1em solid currentColor;
-  border-radius: 50%;
-  vertical-align: -0.02em;
-}
-
-.tcal.has-checkbox .tcal-text.is-empty::before {
-  margin-right: 0;
-}
-
 .tcal-cell.is-hidden {
   visibility: hidden;
 }
@@ -283,16 +264,4 @@
 /* Text couldn't fit even at the minimum size — flag it for the editor. */
 .tcal.is-editing .tcal-body.is-overflowing {
   box-shadow: inset 0 0 0 1.5px #FC705F;
-}
-
-/* ---- Print: one calendar per US Letter landscape page ---------------- */
-@media print {
-  .tcal-frame {
-    width: 11in;
-    height: 8.5in;
-    aspect-ratio: auto;
-  }
-  .tcal {
-    transform: scale(1.33333) !important;
-  }
 }

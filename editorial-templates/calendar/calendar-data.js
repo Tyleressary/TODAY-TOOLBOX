@@ -41,7 +41,7 @@
     { key: 'band',       label: 'Day tab' },
     { key: 'bandText',   label: 'Day tab text' },
     { key: 'cell',       label: 'Cell background' },
-    { key: 'cellText',   label: 'Cell text & checkbox' },
+    { key: 'cellText',   label: 'Cell text' },
   ];
 
   // A theme = one accent + its tint, applied the way the references do.
@@ -83,14 +83,11 @@
       (overrides.cells && overrides.cells[i] != null) ? overrides.cells[i] : cellText);
     const themeId = overrides.theme && THEMES[overrides.theme] ? overrides.theme : 'purple';
     return {
-      id: overrides.id || newId(),
-      name: overrides.name || 'Untitled calendar',
       month: overrides.month ?? 'November',
       year: overrides.year ?? '2023',
       eyebrowSuffix: overrides.eyebrowSuffix ?? 'Challenge',
       headline: overrides.headline ?? '31-Day Walking Streak',
       dayLabel: overrides.dayLabel ?? 'Day',
-      showCheckbox: overrides.showCheckbox ?? true,
       days,
       // Always MAX_DAYS long so shrinking then growing the day count keeps text.
       cells,
@@ -98,24 +95,10 @@
     };
   }
 
-  // ---------------------------------------------------------------------
-  // CUSTOMIZE: preset calendars shown in the "New from preset" menu.
-  // Add an entry here to ship a ready-made calendar to the whole team.
-  // ---------------------------------------------------------------------
-  const PRESETS = [
-    { presetId: 'walking-nov-2023', name: 'November 2023 Walking Streak', month: 'November', year: '2023', theme: 'purple' },
-    { presetId: 'walking-dec-2023', name: 'December 2023 Walking Streak', month: 'December', year: '2023', theme: 'yellow' },
-    { presetId: 'blank', name: 'Blank calendar', headline: 'Headline', cellText: '', theme: 'teal' },
-  ];
-
   function clampDays(n) {
     n = Math.round(Number(n));
     if (!Number.isFinite(n)) return 31;
     return Math.min(MAX_DAYS, Math.max(MIN_DAYS, n));
-  }
-
-  function newId() {
-    return 'cal-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
 
   const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july',
@@ -130,7 +113,7 @@
   }
 
   window.CalendarData = {
-    PALETTE, COLOR_ROLES, THEMES, PRESETS, MIN_DAYS, MAX_DAYS,
-    createCalendar, clampDays, daysInMonth, newId,
+    PALETTE, COLOR_ROLES, THEMES, MIN_DAYS, MAX_DAYS,
+    createCalendar, clampDays, daysInMonth,
   };
 })();

@@ -127,7 +127,6 @@
       node.addEventListener('paste', pastePlainText);
       node.addEventListener('input', () => {
         this.data.cells[index] = node.innerText.replace(/\n$/, '');
-        node.classList.toggle('is-empty', this.data.cells[index] === '');
         this.fitCell(index);
         this.onChange(this.data);
       });
@@ -153,11 +152,9 @@
         cell.li.classList.toggle('is-hidden', i >= d.days);
         cell.day.textContent = `${d.dayLabel} ${i + 1}`.trim();
         if (document.activeElement !== cell.text) cell.text.textContent = d.cells[i] || '';
-        cell.text.classList.toggle('is-empty', !d.cells[i]);
       });
       // Trim trailing empty rows so e.g. 28 days is exactly 4 rows.
       this.grid.style.gridTemplateRows = `repeat(${Math.ceil(d.days / 7)}, 89px)`;
-      this.root.classList.toggle('has-checkbox', d.showCheckbox !== false);
       this.applyColors(d.colors);
       this.applyLogo(d.colors.logo);
       this.applyEditing();
