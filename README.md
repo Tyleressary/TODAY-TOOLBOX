@@ -55,6 +55,19 @@ A hub page collecting reusable layouts for recurring franchises and other editor
 - Artwork lives at `assets/today-vault-logo.png`, pre-trimmed to its alpha bounds and downscaled to 576px (2× the render size).
 - Enter a file name and export as a single flattened JPG at full 2400×1200 resolution.
 
+#### Challenge Calendar Template (`/editorial-templates/calendar/`)
+
+- Recreates the "31-Day Walking Streak" Start TODAY calendar exports: a 792×612 artboard (US Letter landscape), measured from the reference files and scaled as a whole so proportions never distort at any screen width.
+- All text is set in Mada (variable weight, self-hosted at `assets/fonts/Mada-Variable-*.woff2`, OFL license alongside).
+- The calendar is always editable: click the headline, month, year, "Challenge", or any day box to type directly on it. The settings panel below has tabs for content (calendar name, number of days, week boxes, day tab label, fill all days), color themes, custom colors, and download.
+- Day boxes all use the same default size (16px on the artboard). A box whose text would need more than 3 lines shrinks — that box only — down to an 8px minimum; the box itself never resizes. A box that still can't fit is outlined red while editing (the outline never appears in the export).
+- Colors are limited to the approved palette sampled from the references (five accents, their five tints, and white). "Color themes" reproduces each reference combination; "Custom colors" sets each part (background, banner, headline text, logo, day tab, tab text, cell, cell text) individually.
+- 1–35 days (7 columns × up to 5 rows); "Match month" sets the count from the month/year shown.
+- Optional week boxes fill the empty grid slots after the last day (days + weeks ≤ 35). Each week box's tab label ("WEEK 1") and text are edited in place on the calendar. Week tabs are set heavier and tighter than day tabs, and all week boxes share one text size (the smallest any of them needs), matching the reference.
+- The working calendar is saved automatically in the browser (localStorage), so it's still there after a reload.
+- Download tab: export as a 2376×1836 JPG (3×). The file name defaults to the month, year and headline.
+- Code: `calendar-data.js` (palette, themes, default content), `calendar.js` (the reusable `TodayCalendar` component), `calendar.css` (the design), `app.js` (page controls). Change the defaults a new calendar starts with in `createCalendar` in `calendar-data.js`.
+
 New templates are added as subfolders here and linked from the hub page.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
