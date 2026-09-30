@@ -29,6 +29,7 @@
         <button type="button" role="tab" class="tab active" data-tab="content" aria-selected="true">Content</button>
         <button type="button" role="tab" class="tab" data-tab="theme" aria-selected="false">Color themes</button>
         <button type="button" role="tab" class="tab" data-tab="colors" aria-selected="false">Custom colors</button>
+        <button type="button" role="tab" class="tab" data-tab="download" aria-selected="false">Download</button>
       </div>
 
       <div class="tab-panel" data-panel="content" role="tabpanel">
@@ -73,12 +74,14 @@
         <div class="role-list" id="roleList"></div>
       </div>
 
-    </section>
-
-    <section class="export-panel" aria-label="Export">
-      <label for="filename">File name</label>
-      <input id="filename" type="text" placeholder="challenge-calendar" autocomplete="off">
-      <button type="button" id="downloadBtn">Download JPG</button>
+      <div class="tab-panel" data-panel="download" role="tabpanel" hidden>
+        <p class="panel-note">Saves the calendar exactly as shown as a 2376 &times; 1836 JPG. Editing outlines are left out.</p>
+        <div class="export-panel download-panel">
+          <label for="filename">File name</label>
+          <input id="filename" type="text" placeholder="challenge-calendar" autocomplete="off">
+          <button type="button" id="downloadBtn">Download JPG</button>
+        </div>
+      </div>
     </section>
   </main>
 
