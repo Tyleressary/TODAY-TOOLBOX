@@ -68,9 +68,10 @@
   };
 
   // Grid limits: 7 columns x 5 rows is what the reference layout holds
-  // without changing cell proportions.
+  // without changing cell proportions. Day boxes + week boxes share it.
+  const MAX_BOXES = 35;
   const MIN_DAYS = 1;
-  const MAX_DAYS = 35;
+  const MAX_DAYS = MAX_BOXES;
 
   /**
    * Build a complete calendar definition. Anything omitted falls back to
@@ -81,6 +82,12 @@
     const cellText = overrides.cellText ?? 'Walk';
     const cells = Array.from({ length: MAX_DAYS }, (_, i) =>
       (overrides.cells && overrides.cells[i] != null) ? overrides.cells[i] : cellText);
+    // Week boxes fill the slots after the last day ("WEEK 1", "WEEK 2", ...).
+    const weeks = clampWeeks(overrides.weeks ?? 0, days);
+    const weekLabels = Array.from({ length: MAX_BOXES }, (_, i) =>
+      (overrides.weekLabels && overrides.weekLabels[i] != null) ? overrides.weekLabels[i] : `Week ${i + 1}`);
+    const weekCells = Array.from({ length: MAX_BOXES }, (_, i) =>
+      (overrides.weekCells && overrides.weekCells[i] != null) ? overrides.weekCells[i] : '');
     const themeId = overrides.theme && THEMES[overrides.theme] ? overrides.theme : 'purple';
     return {
       month: overrides.month ?? 'November',
@@ -91,6 +98,9 @@
       days,
       // Always MAX_DAYS long so shrinking then growing the day count keeps text.
       cells,
+      weeks,
+      weekLabels,
+      weekCells,
       colors: { ...THEMES[themeId].colors, ...(overrides.colors || {}) },
     };
   }
@@ -99,6 +109,13 @@
     n = Math.round(Number(n));
     if (!Number.isFinite(n)) return 31;
     return Math.min(MAX_DAYS, Math.max(MIN_DAYS, n));
+  }
+
+  // Week boxes can use whatever slots the days leave free.
+  function clampWeeks(n, days) {
+    n = Math.round(Number(n));
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(MAX_BOXES - days, Math.max(0, n));
   }
 
   const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july',
@@ -113,7 +130,7 @@
   }
 
   window.CalendarData = {
-    PALETTE, COLOR_ROLES, THEMES, MIN_DAYS, MAX_DAYS,
-    createCalendar, clampDays, daysInMonth,
+    PALETTE, COLOR_ROLES, THEMES, MIN_DAYS, MAX_DAYS, MAX_BOXES,
+    createCalendar, clampDays, clampWeeks, daysInMonth,
   };
 })();

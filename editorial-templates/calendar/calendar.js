@@ -83,24 +83,51 @@
         this.wireSingleLine(node);
       });
 
-      const maxDays = window.CalendarData.MAX_DAYS;
+      // Day boxes first, then week boxes, which fill the slots after the
+      // last day. Both sets are built once at full size and shown/hidden.
+      const max = window.CalendarData.MAX_BOXES;
       this.cells = [];
-      for (let i = 0; i < maxDays; i++) {
-        const li = el('li', 'tcal-cell');
-        const band = el('div', 'tcal-band');
-        const day = el('span', 'tcal-day');
-        band.appendChild(day);
-        const body = el('div', 'tcal-body');
-        const text = el('div', 'tcal-text');
-        text.dataset.cell = String(i);
-        body.appendChild(text);
-        li.append(band, body);
-        this.grid.appendChild(li);
-        this.wireCell(text, i);
-        this.cells.push({ li, day, body, text });
+      this.weekCells = [];
+      for (let i = 0; i < max; i++) this.cells.push(this.buildCell('cells', i));
+      for (let i = 0; i < max; i++) {
+        const cell = this.buildCell('weekCells', i);
+        cell.li.classList.add('tcal-cell--week');
+        this.wireWeekLabel(cell.day, i);
+        this.weekCells.push(cell);
       }
 
       this.frame.replaceChildren(root);
+    }
+
+    // One box: domed tab + white body. `key` is the data array its text
+    // lives in ('cells' for days, 'weekCells' for weeks).
+    buildCell(key, index) {
+      const li = el('li', 'tcal-cell');
+      const band = el('div', 'tcal-band');
+      const day = el('span', 'tcal-day');
+      band.appendChild(day);
+      const body = el('div', 'tcal-body');
+      const text = el('div', 'tcal-text');
+      text.dataset[key === 'cells' ? 'cell' : 'week'] = String(index);
+      body.appendChild(text);
+      li.append(band, body);
+      this.grid.appendChild(li);
+      const cell = { li, day, body, text };
+      this.wireCell(cell, key, index);
+      return cell;
+    }
+
+    // Week tab labels ("WEEK 1") are editable in place, one line each.
+    wireWeekLabel(node, index) {
+      node.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); node.blur(); }
+      });
+      node.addEventListener('paste', pastePlainText);
+      node.addEventListener('input', () => {
+        this.data.weekLabels[index] = node.textContent.replace(/\s+/g, ' ').trim();
+        this.onChange(this.data);
+      });
+      node.addEventListener('blur', () => { node.textContent = this.data.weekLabels[index]; });
     }
 
     // Headline / month / year / suffix: one line, Enter commits.
@@ -122,12 +149,13 @@
       });
     }
 
-    // Calendar cells: multi-line, each re-fits itself on every keystroke.
-    wireCell(node, index) {
+    // Box text: multi-line, each box re-fits itself on every keystroke.
+    wireCell(cell, key, index) {
+      const node = cell.text;
       node.addEventListener('paste', pastePlainText);
       node.addEventListener('input', () => {
-        this.data.cells[index] = node.innerText.replace(/\n$/, '');
-        this.fitCell(index);
+        this.data[key][index] = node.innerText.replace(/\n$/, '');
+        if (key === 'weekCells') this.fitWeeks(); else this.fitCell(cell);
         this.onChange(this.data);
       });
     }
@@ -149,12 +177,17 @@
         if (document.activeElement !== this.fields[key]) this.fields[key].textContent = d[key];
       }
       this.cells.forEach((cell, i) => {
-        cell.li.classList.toggle('is-hidden', i >= d.days);
+        cell.li.hidden = i >= d.days;
         cell.day.textContent = `${d.dayLabel} ${i + 1}`.trim();
         if (document.activeElement !== cell.text) cell.text.textContent = d.cells[i] || '';
       });
+      this.weekCells.forEach((cell, i) => {
+        cell.li.hidden = i >= d.weeks;
+        if (document.activeElement !== cell.day) cell.day.textContent = d.weekLabels[i] || '';
+        if (document.activeElement !== cell.text) cell.text.textContent = d.weekCells[i] || '';
+      });
       // Trim trailing empty rows so e.g. 28 days is exactly 4 rows.
-      this.grid.style.gridTemplateRows = `repeat(${Math.ceil(d.days / 7)}, 89px)`;
+      this.grid.style.gridTemplateRows = `repeat(${Math.ceil((d.days + d.weeks) / 7)}, 89px)`;
       this.applyColors(d.colors);
       this.applyLogo(d.colors.logo);
       this.applyEditing();
@@ -198,7 +231,11 @@
     applyEditing() {
       const mode = this.editing ? (supportsPlaintextOnly ? 'plaintext-only' : 'true') : 'false';
       this.root.classList.toggle('is-editing', this.editing);
-      const editable = [...Object.values(this.fields), ...this.cells.map((c) => c.text)];
+      const editable = [
+        ...Object.values(this.fields),
+        ...this.cells.map((c) => c.text),
+        ...this.weekCells.flatMap((c) => [c.day, c.text]),
+      ];
       editable.forEach((node) => {
         if (this.editing) {
           node.setAttribute('contenteditable', mode);
@@ -220,7 +257,18 @@
 
     fitAll() {
       this.fitHeadline();
-      for (let i = 0; i < this.data.days; i++) this.fitCell(i);
+      this.cells.slice(0, this.data.days).forEach((cell) => this.fitCell(cell));
+      this.fitWeeks();
+    }
+
+    // Week boxes are fitted like day boxes, then all share the smallest
+    // resulting size so the row reads as one set (as in the reference).
+    fitWeeks() {
+      const shown = this.weekCells.slice(0, this.data.weeks);
+      shown.forEach((cell) => this.fitCell(cell));
+      const sizes = shown.map((c) => parseFloat(getComputedStyle(c.text).fontSize));
+      const min = Math.min(...sizes);
+      shown.forEach((c, i) => { if (sizes[i] > min) c.text.style.fontSize = min + 'px'; });
     }
 
     fitHeadline() {
@@ -239,8 +287,7 @@
      * never changes. Measurements are in unscaled layout pixels, so the
      * current zoom level doesn't matter.
      */
-    fitCell(index) {
-      const { text, body } = this.cells[index];
+    fitCell({ text, body }) {
       text.classList.remove('is-breaking');
       text.style.maxHeight = 'none';
       text.style.fontSize = '';

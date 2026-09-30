@@ -109,13 +109,18 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 18px 24px;
-  align-items: end;
+  align-items: start;
 }
 
 .field {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--text-dim);
 }
 
 .bulk-row {

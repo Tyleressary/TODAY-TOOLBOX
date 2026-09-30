@@ -232,8 +232,19 @@
   overflow-wrap: anywhere;
 }
 
-.tcal-cell.is-hidden {
-  visibility: hidden;
+.tcal-cell[hidden] {
+  display: none;
+}
+
+/* Week boxes: same box, but the tab label is set tighter and heavier,
+   per the reference ("WEEK 1" vs "DAY 31"). */
+.tcal-cell--week .tcal-band {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.tcal-cell--week .tcal-day {
+  margin-right: -0.04em;
 }
 
 /* ---- Edit mode ------------------------------------------------------- */

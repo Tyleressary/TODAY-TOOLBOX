@@ -10,13 +10,15 @@
 (() => {
   'use strict';
 
-  const { PALETTE, COLOR_ROLES, THEMES, createCalendar, clampDays, daysInMonth } = window.CalendarData;
+  const { PALETTE, COLOR_ROLES, THEMES, createCalendar, clampDays, clampWeeks, daysInMonth, MAX_BOXES } = window.CalendarData;
   const STORAGE_KEY = 'today-toolbox.calendar.v2';
   const EXPORT_SCALE = 3; // JPG = 2376 x 1836 (3x the 792 x 612 artboard)
 
   const $ = (id) => document.getElementById(id);
   const nameInput = $('nameInput');
   const daysInput = $('daysInput');
+  const weeksInput = $('weeksInput');
+  const weeksHint = $('weeksHint');
   const dayLabelInput = $('dayLabelInput');
   const fillInput = $('fillInput');
   const themeList = $('themeList');
@@ -85,12 +87,17 @@
     save();
   });
 
-  daysInput.addEventListener('change', () => {
-    current.days = clampDays(daysInput.value);
-    daysInput.value = current.days;
+  // Days and week boxes share the 35-box grid; days win if they collide.
+  function setCounts(days, weeks) {
+    current.days = clampDays(days);
+    current.weeks = clampWeeks(weeks, current.days);
     calendar.render();
+    syncControls();
     save();
-  });
+  }
+
+  daysInput.addEventListener('change', () => setCounts(daysInput.value, current.weeks));
+  weeksInput.addEventListener('change', () => setCounts(current.days, weeksInput.value));
 
   $('matchMonthBtn').addEventListener('click', () => {
     const n = daysInMonth(current.month, current.year);
@@ -98,10 +105,7 @@
       alert('Set a month name (e.g. "November") and a year on the calendar first.');
       return;
     }
-    current.days = n;
-    daysInput.value = n;
-    calendar.render();
-    save();
+    setCounts(n, current.weeks);
   });
 
   dayLabelInput.addEventListener('input', () => {
@@ -174,6 +178,9 @@
   function syncControls() {
     nameInput.value = current.headline;
     daysInput.value = current.days;
+    weeksInput.value = current.weeks;
+    weeksInput.max = MAX_BOXES - current.days;
+    weeksHint.textContent = `Up to ${MAX_BOXES - current.days} with ${current.days} days. Click a week tab or box on the calendar to edit it.`;
     dayLabelInput.value = current.dayLabel;
     roleList.querySelectorAll('.swatch-btn').forEach((b) => {
       const on = (current.colors[b.dataset.role] || '').toUpperCase() === b.dataset.hex;
