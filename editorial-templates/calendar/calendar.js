@@ -37,7 +37,7 @@
   const HEADLINE_MIN_SIZE = 24;
 
   // Alpha-only logo artwork, tinted per calendar (path relative to the page).
-  const LOGO_MASK_URL = '../../assets/start-today-logo-mask.png';
+  const LOGO_MASK_URL = '../../assets/start-today-logo-hd.png';
 
   const supportsPlaintextOnly = (() => {
     const probe = document.createElement('div');
