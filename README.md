@@ -10,17 +10,21 @@ python3 -m http.server 8000
 
 Then open `http://localhost:8000/`.
 
-## Tools
+## Structure
 
-### Split Image Generator (`/split-image/`)
+The home page lists categories; each category page lists its templates.
 
-Builds split-image graphics for social/promo use:
+```
+/                             Toolbox home
+/editorial-templates/         Editorial Templates — 5 templates
+/social-templates/            Social Templates — empty for now
+```
 
-- Layouts: 2-split, 3-split, 4-split (straight vertical dividers), or 4-split grid (one vertical + one horizontal divider crossing in the middle, forming a 2x2 grid). Divider position is fixed and evenly spaced — not user-adjustable.
-- Output size: 2400×1200 (2:1), 1920×1080 (16:9), or 1000×1000 (1:1 square). Square output only supports the 2-split layout.
-- Upload one image per panel via the buttons above the canvas, or drag an image file straight onto a panel (or its upload slot) to drop it in.
-- Drag within a panel to reposition its image, and use each slot's zoom slider to scale it.
-- Enter a file name and export as a single flattened JPG at full output resolution.
+The Split Image Generator lives at `/split-image/` and is listed under Editorial
+Templates; it is a general-purpose split tool rather than a fixed franchise
+layout, but in practice it sits alongside Trivia Tease, which is itself a split.
+
+## Templates
 
 ### Editorial Templates (`/editorial-templates/`)
 
@@ -71,10 +75,46 @@ A hub page collecting reusable layouts for recurring franchises and other editor
 - Download tab: export as a 2376×1836 JPG (3×). The file name defaults to the month, year and headline.
 - Code: `calendar-data.js` (palette, themes, default content), `calendar.js` (the reusable `TodayCalendar` component), `calendar.css` (the design), `app.js` (page controls). Change the defaults a new calendar starts with in `createCalendar` in `calendar-data.js`.
 
+#### Split Image Generator (`/split-image/`)
+
+Builds split-image graphics for social/promo use:
+
+- Layouts: 2-split, 3-split, 4-split (straight vertical dividers), or 4-split grid (one vertical + one horizontal divider crossing in the middle, forming a 2x2 grid). Divider position is fixed and evenly spaced — not user-adjustable.
+- Output size: 2400×1200 (2:1), 1920×1080 (16:9), or 1000×1000 (1:1 square). Square output only supports the 2-split layout.
+- Upload one image per panel via the buttons above the canvas, or drag an image file straight onto a panel (or its upload slot) to drop it in.
+- Drag within a panel to reposition its image, and use each slot's zoom slider to scale it.
+- Enter a file name and export as a single flattened JPG at full output resolution.
+
 New templates are added as subfolders here and linked from the hub page.
+
+### Social Templates (`/social-templates/`)
+
+Empty for now. The page exists so the category is present in the navigation and
+new social templates can be added as subfolders without restructuring the home page.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
 
-## Design
+## Design system
+
+Shared in `assets/toolbox.css` and used by every page.
+
+- **Type**: Libre Bodoni (`--font-display`) for the page name in the header band
+  and the home link; Source Sans 3 (`--font-ui`) for all functional UI. Both load
+  from Google Fonts. Mada stays self-hosted and is reserved for the Word
+  template's canvas output, where a runtime font failure would corrupt the export.
+- **Header**: `.brand-band` — a lavender (`--purple-100`) band holding the TODAY
+  wordmark and the page name. Identical on all eight pages.
+- **Cards**: `.category-card` is the envelope used on the home page (tinted body,
+  saturated flap cut with `clip-path`); `.template-tile` is the flat square used
+  on category pages. Fill and label ink are paired by the `.fill-*` classes.
+- **Centering**: `.card-grid` is flex-wrap with `justify-content: center`, not an
+  auto-fit grid. An auto-fit grid leaves a short final row stretched or
+  left-aligned; flex keeps a trailing row of one or two tiles genuinely centered.
+- **Contrast**: label ink is chosen per fill by measured ratio, so light fills
+  (blue, amber) take dark type and dark fills (red, green, purple) take white.
+  Selected controls use `--purple-500` rather than red, because white on red-500
+  is 3.2:1 — fine for the large Download button, not for a 14px control label.
+
+## Palette
 
 Shared color palette and tokens live in `assets/toolbox.css` (`:root`), documented in `docs/color-palette.md`.

@@ -4,64 +4,37 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TODAY Toolbox</title>
-<link rel="stylesheet" href="assets/toolbox.css?v=3">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Bodoni:ital,wght@0,400..700;1,400..700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="assets/toolbox.css?v=4">
 </head>
 <body>
-  <header class="site-header home-header">
-    <div class="brand-lockup">
+  <header class="page-shell">
+    <div class="brand-band">
       <img src="assets/logo.png?v=3" alt="TODAY" class="site-logo">
-      <h1>Toolbox</h1>
+      <h1 class="brand-word">Toolbox</h1>
     </div>
-    <p class="subtitle">In-house graphic &amp; production tools for the team</p>
+    <p class="page-intro">In-house graphic &amp; production templates for the team.</p>
   </header>
 
-  <main class="tool-grid">
-    <a class="tool-card" href="split-image/index.html">
-      <div class="tool-card-thumb split-thumb" aria-hidden="true">
-        <svg viewBox="0 0 240 120" preserveAspectRatio="none">
-          <rect x="0" y="0" width="76" height="120" fill="#ff513c"/>
-          <rect x="80" y="0" width="76" height="120" fill="#4a515c"/>
-          <rect x="160" y="0" width="80" height="120" fill="#abb4c2"/>
-        </svg>
-      </div>
-      <div class="tool-card-body">
-        <h2>Split Image Generator</h2>
-        <p>Build 2, 3, or 4-way split graphics at 2400&times;1200, 1920&times;1080, or a 1000&times;1000 square, then export as a JPG.</p>
-      </div>
-    </a>
-
-    <a class="tool-card" href="editorial-templates/index.html">
-      <div class="tool-card-thumb" aria-hidden="true">
-        <svg viewBox="0 0 240 120" preserveAspectRatio="none">
-          <rect x="0" y="0" width="46" height="38" fill="#ff513c"/>
-          <rect x="49" y="0" width="46" height="38" fill="#4a515c"/>
-          <rect x="98" y="0" width="46" height="38" fill="#abb4c2"/>
-          <rect x="147" y="0" width="46" height="38" fill="#4acaf1"/>
-          <rect x="196" y="0" width="44" height="38" fill="#4a515c"/>
-          <rect x="0" y="41" width="46" height="38" fill="#abb4c2"/>
-          <rect x="49" y="41" width="46" height="38" fill="#ff513c"/>
-          <rect x="98" y="41" width="46" height="38" fill="#4acaf1"/>
-          <rect x="147" y="41" width="46" height="38" fill="#4a515c"/>
-          <rect x="196" y="41" width="44" height="38" fill="#abb4c2"/>
-          <rect x="0" y="82" width="46" height="38" fill="#4acaf1"/>
-          <rect x="49" y="82" width="46" height="38" fill="#abb4c2"/>
-          <rect x="98" y="82" width="46" height="38" fill="#4a515c"/>
-          <rect x="147" y="82" width="46" height="38" fill="#ff513c"/>
-          <rect x="196" y="82" width="44" height="38" fill="#4acaf1"/>
-        </svg>
-      </div>
-      <div class="tool-card-body">
-        <h2>Editorial Templates</h2>
-        <p>Reusable layouts for franchises and other editorial projects &mdash; Trivia Tease, Word Explain, the Tease Image Branding Kit, and the Challenge Calendar.</p>
-      </div>
-    </a>
-
-    <div class="tool-card tool-card-placeholder" aria-hidden="true">
-      <div class="tool-card-body">
-        <h2>More tools coming soon</h2>
-        <p>This toolbox will grow with more team tools over time.</p>
-      </div>
-    </div>
+  <main class="page-shell">
+    <ul class="card-grid">
+      <li>
+        <a class="category-card fill-red" href="editorial-templates/index.html">
+          <span class="category-flap">
+            <span class="category-label">Editorial<br>Templates</span>
+          </span>
+        </a>
+      </li>
+      <li>
+        <a class="category-card fill-amber" href="social-templates/index.html">
+          <span class="category-flap">
+            <span class="category-label">Social<br>Templates</span>
+          </span>
+        </a>
+      </li>
+    </ul>
   </main>
 
   <footer class="site-footer">
