@@ -45,15 +45,18 @@ A hub page collecting reusable layouts for recurring franchises and other editor
 - Word/underline color and background color are each an independent dropdown, same 36-color palette + white component used in Trivia Tease.
 - Enter a file name and export as a single flattened JPG at full output resolution.
 
-#### TODAY VAULT Template (`/editorial-templates/today-vault/`)
+#### Tease Image Branding Kit (`/editorial-templates/tease-image-branding-kit/`)
 
-- Single image at 2400×1200 with the TODAY VAULT badge composited over it.
-- Upload one image; it is cover-fitted to the frame, drag to reposition and use the zoom slider to scale.
-- Badge corner: bottom-left or bottom-right (bottom-right by default, matching the reference example).
-- The badge is fixed — its size and position come only from constants and the chosen corner, and it has no hit test, so dragging always moves the photo underneath and never the logo.
-- Badge geometry was measured from the supplied reference: 24% of canvas height (288px), inset 3% of width from the side and 7.5% of height from the bottom. Stored as fractions so it stays correct if the canvas size changes.
-- Artwork lives at `assets/today-vault-logo.png`, pre-trimmed to its alpha bounds and downscaled to 576px (2× the render size).
-- Enter a file name and export as a single flattened JPG at full 2400×1200 resolution.
+- Single image with a branding bug composited into a bottom corner.
+- Output size: 2400×1200 (2:1) or 1000×1000 (1:1).
+- Logo: TODAY VAULT or TODAY 75. Every logo renders at the same size in the same place, so switching changes only the artwork.
+- Upload one image (button or drag-and-drop); it is cover-fitted to the frame, drag to reposition and use the zoom slider to scale.
+- Bug corner: bottom-left or bottom-right (bottom-right by default, matching the reference example).
+- The bug is fixed — its rect comes only from constants, the chosen corner and the output size, and it has no hit test, so dragging always moves the photo underneath and never the logo.
+- Bug geometry derives from the approved 2400×1200 reference (288px, 72px from the side, 90px from the bottom). Size scales with the geometric mean of the frame (`288 / sqrt(2400*1200)`), so it keeps the same visual weight in any aspect — 288px on the 2:1, 170px on the square. Margins are multiples of the bug itself (72/288 and 90/288), which reproduces the reference exactly and carries over to any format; per-axis fractions of the canvas would not survive the aspect change.
+- Artwork lives at `assets/today-vault-logo.png` and `assets/today-75-logo.png`, each pre-trimmed to its alpha bounds (both sources carry uneven transparent padding that would otherwise skew size and margins) and downscaled to 576px.
+- Enter a file name and export as a single flattened JPG at full output resolution.
+- The former `/editorial-templates/today-vault/` path redirects here.
 
 New templates are added as subfolders here and linked from the hub page.
 

@@ -3,34 +3,68 @@
 
   const MAX_ZOOM = 3;
 
-  const W = 2400;
-  const H = 1200;
+  const SIZES = {
+    wide: { w: 2400, h: 1200 },
+    square: { w: 1000, h: 1000 },
+  };
 
-  // Badge placement, measured off the supplied example.jpg and expressed as
-  // fractions of the canvas so the numbers survive a size change:
-  // 0.24 * 1200 = 288px tall, 72px in from the side, 90px up from the bottom.
-  const LOGO_SCALE = 0.24;
-  const LOGO_MARGIN_X = 0.03;
-  const LOGO_MARGIN_Y = 0.075;
+  // Bug geometry, derived from the approved 2400x1200 reference: 288px bug,
+  // 72px in from the side, 90px up from the bottom.
+  //
+  // Size scales with the geometric mean of the frame (288 / sqrt(2400*1200)),
+  // so the bug keeps the same visual weight whatever the aspect ratio:
+  // 2400x1200 -> 288px, 1000x1000 -> 170px. Per-axis fractions would not
+  // survive the change -- on a square they put the bug 30px from the side but
+  // 75px from the bottom, visibly hugging the edge.
+  const LOGO_SCALE_K = 0.169706;
+  // Margins as multiples of the bug (72/288, 90/288), which reproduces the
+  // reference exactly on the 2:1 and keeps the same inset on any format.
+  const LOGO_MARGIN_X_K = 0.25;
+  const LOGO_MARGIN_Y_K = 0.3125;
 
   const CORNERS = { br: 'bottom-right', bl: 'bottom-left' };
+
+  // Every logo renders at the same size in the same place, so the only thing
+  // that changes between them is the artwork.
+  const LOGOS = {
+    vault: { label: 'TODAY VAULT', src: '../../assets/today-vault-logo.png' },
+    today75: { label: 'TODAY 75', src: '../../assets/today-75-logo.png' },
+  };
 
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   const uploadRow = document.getElementById('uploadRow');
   const cornerGroup = document.getElementById('cornerGroup');
+  const logoGroup = document.getElementById('logoGroup');
+  const sizeGroup = document.getElementById('sizeGroup');
   const filenameInput = document.getElementById('filename');
   const downloadBtn = document.getElementById('downloadBtn');
 
   let corner = 'br';
+  let logoId = 'vault';
+  let sizeMode = 'wide';
   let photo = null; // { img, scaleMultiplier, panX, panY }
   let dragState = null;
   let fileDragOver = false; // a file drag is hovering the canvas
 
-  const logoImg = new Image();
-  let logoReady = false;
-  logoImg.onload = () => { logoReady = true; render(); };
-  logoImg.src = '../../assets/today-vault-logo.png';
+  // Both logos are decoded up front, so switching never flashes an empty
+  // corner and an export can never race a pending decode.
+  const logoImages = {};
+  Object.entries(LOGOS).forEach(([id, { src }]) => {
+    const img = new Image();
+    img.onload = () => render();
+    img.src = src;
+    logoImages[id] = img;
+  });
+
+  function getDims() {
+    return SIZES[sizeMode];
+  }
+
+  function getLogoImg() {
+    const img = logoImages[logoId];
+    return img && img.complete && img.naturalWidth ? img : null;
+  }
 
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
@@ -38,7 +72,8 @@
 
   // The photo fills the whole frame; there is only ever one.
   function getPanelRect() {
-    return { minX: 0, maxX: W, minY: 0, maxY: H };
+    const { w, h } = getDims();
+    return { minX: 0, maxX: w, minY: 0, maxY: h };
   }
 
   function panelImageMetrics(panel, bbox) {
@@ -63,32 +98,47 @@
   }
 
   function drawPlaceholder() {
+    const { w, h } = getDims();
     ctx.fillStyle = '#d8dde5';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = '#4a515c';
-    ctx.font = `${Math.round(W * 0.022)}px -apple-system, sans-serif`;
+    ctx.font = `${Math.round(w * 0.022)}px -apple-system, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Upload an image', W / 2, H / 2);
+    ctx.fillText('Upload an image', w / 2, h / 2);
   }
 
   // The badge is locked to a corner: its rect comes only from the constants
   // above and the chosen corner, never from pointer state.
   function getLogoRect() {
-    const h = H * LOGO_SCALE;
-    const w = h * (logoImg.width / logoImg.height);
-    const y = H - h - H * LOGO_MARGIN_Y;
-    const x = corner === 'bl' ? W * LOGO_MARGIN_X : W - w - W * LOGO_MARGIN_X;
-    return { x, y, w, h };
+    const img = getLogoImg();
+    if (!img) return null;
+    const { w: cw, h: ch } = getDims();
+    // Every logo is fitted into a square box of this size by its longer edge,
+    // so they all occupy the same footprint in the same spot regardless of
+    // their own proportions.
+    const box = LOGO_SCALE_K * Math.sqrt(cw * ch);
+    const k = box / Math.max(img.width, img.height);
+    const w = img.width * k;
+    const h = img.height * k;
+    const boxX = corner === 'bl'
+      ? box * LOGO_MARGIN_X_K
+      : cw - box - box * LOGO_MARGIN_X_K;
+    const boxY = ch - box - box * LOGO_MARGIN_Y_K;
+    return { x: boxX + (box - w) / 2, y: boxY + (box - h) / 2, w, h };
   }
 
   function drawLogo() {
-    if (!logoReady) return;
-    const { x, y, w, h } = getLogoRect();
-    ctx.drawImage(logoImg, x, y, w, h);
+    const rect = getLogoRect();
+    if (!rect) return;
+    ctx.drawImage(getLogoImg(), rect.x, rect.y, rect.w, rect.h);
   }
 
   function render() {
+    const { w: W, h: H } = getDims();
+    if (canvas.width !== W) canvas.width = W;
+    if (canvas.height !== H) canvas.height = H;
+
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#f0f2f5';
     ctx.fillRect(0, 0, W, H);
@@ -105,6 +155,7 @@
 
   function drawDragHighlight() {
     if (!fileDragOver) return;
+    const { w: W, h: H } = getDims();
     ctx.save();
     ctx.fillStyle = 'rgba(255, 81, 60, 0.18)';
     ctx.fillRect(0, 0, W, H);
@@ -191,18 +242,41 @@
   function setCorner(value) {
     if (!CORNERS[value] || value === corner) return;
     corner = value;
-    updateCornerUI();
+    updateControlsUI();
     render();
   }
 
-  function updateCornerUI() {
-    cornerGroup.querySelectorAll('button').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.value === corner);
+  function setLogo(value) {
+    if (!LOGOS[value] || value === logoId) return;
+    logoId = value;
+    updateControlsUI();
+    render();
+  }
+
+  function setSizeMode(value) {
+    if (!SIZES[value] || value === sizeMode) return;
+    sizeMode = value;
+    updateControlsUI();
+    render();
+  }
+
+  function updateControlsUI() {
+    const sync = (group, current) => group.querySelectorAll('button').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.value === current);
     });
+    sync(cornerGroup, corner);
+    sync(logoGroup, logoId);
+    sync(sizeGroup, sizeMode);
   }
 
   cornerGroup.querySelectorAll('button').forEach((btn) => {
     btn.addEventListener('click', () => setCorner(btn.dataset.value));
+  });
+  logoGroup.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => setLogo(btn.dataset.value));
+  });
+  sizeGroup.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => setSizeMode(btn.dataset.value));
   });
 
   function clientToCanvas(clientX, clientY) {
@@ -257,8 +331,8 @@
   });
 
   downloadBtn.addEventListener('click', () => {
-    const raw = filenameInput.value.trim() || 'today-vault';
-    const safe = raw.replace(/[^a-z0-9-_ ]/gi, '').trim().replace(/\s+/g, '-') || 'today-vault';
+    const raw = filenameInput.value.trim() || 'tease-image';
+    const safe = raw.replace(/[^a-z0-9-_ ]/gi, '').trim().replace(/\s+/g, '-') || 'tease-image';
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
     const a = document.createElement('a');
     a.href = dataUrl;
@@ -268,7 +342,7 @@
     a.remove();
   });
 
-  updateCornerUI();
+  updateControlsUI();
   buildUploadSlot();
   render();
 })();
