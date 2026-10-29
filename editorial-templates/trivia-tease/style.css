@@ -3,13 +3,15 @@
 /* Five across, mirroring the canvas grid, so slot N sits above box N. */
 .upload-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
-@media (max-width: 760px) {
+/* Below this the five columns no longer fit the content box, and a fixed
+   5-up grid overflows the page instead of reflowing. */
+@media (max-width: 920px) {
   .upload-row {
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   }
 }
 

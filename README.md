@@ -110,10 +110,15 @@ Shared in `assets/toolbox.css` and used by every page.
 - **Centering**: `.card-grid` is flex-wrap with `justify-content: center`, not an
   auto-fit grid. An auto-fit grid leaves a short final row stretched or
   left-aligned; flex keeps a trailing row of one or two tiles genuinely centered.
-- **Contrast**: label ink is chosen per fill by measured ratio, so light fills
-  (blue, amber) take dark type and dark fills (red, green, purple) take white.
-  Selected controls use `--purple-500` rather than red, because white on red-500
-  is 3.2:1 — fine for the large Download button, not for a 14px control label.
+- **Card labels**: white Source Sans 3 Black (900) on every fill, per brand
+  direction. White on the lighter fills (blue-500, amber-500) sits below the
+  WCAG AA ratio; that is a deliberate brand call, not an oversight.
+- **Contrast elsewhere**: body and control text all meet AA. Selected controls
+  use `--purple-500` rather than red, because white on red-500 is 3.2:1 — fine
+  for the large Download button, not for a 14px control label.
+- **Header sizing**: `--logo-h` drives both the wordmark height and the heading
+  size. Libre Bodoni's cap height is 0.77em (measured), so the heading is set to
+  `--logo-h / 0.77` and its capitals match the TODAY wordmark at every width.
 
 ## Palette
 
