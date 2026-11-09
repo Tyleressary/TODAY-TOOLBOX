@@ -34,10 +34,9 @@
   // to the canvas.
   const DIVIDER_THICKNESS = 12;
 
-  // Every logo renders at the same size in the same place, so the only thing
-  // that changes between them is the artwork.
+  // Keyed so another bug can be added back as one entry plus a picker; every
+  // logo renders at the same size in the same place regardless.
   const LOGOS = {
-    vault: { label: 'TODAY VAULT', src: '../../assets/today-vault-logo.png' },
     today75: { label: 'TODAY 75', src: '../../assets/today-75-logo.png' },
   };
 
@@ -46,13 +45,12 @@
   const uploadRow = document.getElementById('uploadRow');
   const cornerGroup = document.getElementById('cornerGroup');
   const layoutGroup = document.getElementById('layoutGroup');
-  const logoGroup = document.getElementById('logoGroup');
   const sizeGroup = document.getElementById('sizeGroup');
   const filenameInput = document.getElementById('filename');
   const downloadBtn = document.getElementById('downloadBtn');
 
   let corner = 'br';
-  let logoId = 'vault';
+  let logoId = 'today75';
   let sizeMode = 'wide';
   let layoutId = 'single';
   let panels = []; // panels[i] = { img, scaleMultiplier, panX, panY } | undefined
@@ -319,13 +317,6 @@
     render();
   }
 
-  function setLogo(value) {
-    if (!LOGOS[value] || value === logoId) return;
-    logoId = value;
-    updateControlsUI();
-    render();
-  }
-
   function setSizeMode(value) {
     if (!SIZES[value] || value === sizeMode) return;
     sizeMode = value;
@@ -339,7 +330,6 @@
     });
     sync(cornerGroup, corner);
     sync(layoutGroup, layoutId);
-    sync(logoGroup, logoId);
     sync(sizeGroup, sizeMode);
   }
 
@@ -348,9 +338,6 @@
   });
   layoutGroup.querySelectorAll('button').forEach((btn) => {
     btn.addEventListener('click', () => setLayout(btn.dataset.value));
-  });
-  logoGroup.querySelectorAll('button').forEach((btn) => {
-    btn.addEventListener('click', () => setLogo(btn.dataset.value));
   });
   sizeGroup.querySelectorAll('button').forEach((btn) => {
     btn.addEventListener('click', () => setSizeMode(btn.dataset.value));

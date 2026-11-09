@@ -58,12 +58,18 @@ A hub page collecting reusable layouts for recurring franchises and other editor
   Verified by diffing both tools' output on the same two images: outside the bug the
   canvases are pixel-identical at 2400×1200 and 1000×1000.
 - Output size: 2400×1200 (2:1) or 1000×1000 (1:1).
-- Logo: TODAY VAULT or TODAY 75. Every logo renders at the same size in the same place, so switching changes only the artwork.
+- Logo: the TODAY 75 bug. `LOGOS` in `app.js` is still keyed, so another bug
+  goes back in as one map entry plus a segmented picker; every logo renders at
+  the same size in the same place, so adding one changes only the artwork.
 - Upload one image (button or drag-and-drop); it is cover-fitted to the frame, drag to reposition and use the zoom slider to scale.
 - Bug corner: bottom-left or bottom-right (bottom-right by default, matching the reference example).
 - The bug is fixed — its rect comes only from constants, the chosen corner and the output size, and it has no hit test, so dragging always moves the photo underneath and never the logo.
 - Bug geometry derives from the approved 2400×1200 reference (288px, 72px from the side, 90px from the bottom). Size scales with the geometric mean of the frame (`288 / sqrt(2400*1200)`), so it keeps the same visual weight in any aspect — 288px on the 2:1, 170px on the square. Margins are multiples of the bug itself (72/288 and 90/288), which reproduces the reference exactly and carries over to any format; per-axis fractions of the canvas would not survive the aspect change.
-- Artwork lives at `assets/today-vault-logo.png` and `assets/today-75-logo.png`, each pre-trimmed to its alpha bounds (both sources carry uneven transparent padding that would otherwise skew size and margins) and downscaled to 576px.
+- Artwork lives at `assets/today-75-logo.png`, pre-trimmed to its alpha bounds
+  (the source carries uneven transparent padding that would otherwise skew size
+  and margins) and downscaled to 576px. `assets/today-vault-logo.png` is kept
+  but no longer referenced, so the VAULT bug can be restored without redoing
+  the trim.
 - Enter a file name and export as a single flattened JPG at full output resolution.
 - The former `/editorial-templates/today-vault/` path redirects here.
 
