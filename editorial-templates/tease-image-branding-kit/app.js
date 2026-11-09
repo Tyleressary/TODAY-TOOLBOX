@@ -24,6 +24,16 @@
 
   const CORNERS = { br: 'bottom-right', bl: 'bottom-left' };
 
+  const LAYOUTS = {
+    single: { count: 1 },
+    split2: { count: 2 },
+  };
+
+  // Copied verbatim from split-image/app.js so the centre line is the same
+  // line, not a lookalike: a flat 12px white stroke, deliberately not scaled
+  // to the canvas.
+  const DIVIDER_THICKNESS = 12;
+
   // Every logo renders at the same size in the same place, so the only thing
   // that changes between them is the artwork.
   const LOGOS = {
@@ -35,6 +45,7 @@
   const ctx = canvas.getContext('2d');
   const uploadRow = document.getElementById('uploadRow');
   const cornerGroup = document.getElementById('cornerGroup');
+  const layoutGroup = document.getElementById('layoutGroup');
   const logoGroup = document.getElementById('logoGroup');
   const sizeGroup = document.getElementById('sizeGroup');
   const filenameInput = document.getElementById('filename');
@@ -43,9 +54,11 @@
   let corner = 'br';
   let logoId = 'vault';
   let sizeMode = 'wide';
-  let photo = null; // { img, scaleMultiplier, panX, panY }
+  let layoutId = 'single';
+  let panels = []; // panels[i] = { img, scaleMultiplier, panX, panY } | undefined
   let dragState = null;
   let fileDragOver = false; // a file drag is hovering the canvas
+  let dragHoverIndex = null; // panel a file drag is currently over, if any
 
   // Both logos are decoded up front, so switching never flashes an empty
   // corner and an export can never race a pending decode.
@@ -70,10 +83,21 @@
     return Math.max(min, Math.min(max, v));
   }
 
-  // The photo fills the whole frame; there is only ever one.
-  function getPanelRect() {
+  function getLayout() {
+    return LAYOUTS[layoutId];
+  }
+
+  // Same strip maths as the Split Image Generator: stripW = w / count, full
+  // height. Single image is the degenerate case of one strip.
+  function getPanelRect(i) {
     const { w, h } = getDims();
-    return { minX: 0, maxX: w, minY: 0, maxY: h };
+    const count = getLayout().count;
+    const stripW = w / count;
+    return { minX: i * stripW, maxX: (i + 1) * stripW, minY: 0, maxY: h };
+  }
+
+  function pointInRect(x, y, r) {
+    return x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY;
   }
 
   function panelImageMetrics(panel, bbox) {
@@ -97,15 +121,37 @@
     ctx.drawImage(panel.img, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
   }
 
-  function drawPlaceholder() {
-    const { w, h } = getDims();
+  function drawPlaceholder(bbox, index) {
+    const { w } = getDims();
+    const single = getLayout().count === 1;
     ctx.fillStyle = '#d8dde5';
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(bbox.minX, bbox.minY, bbox.maxX - bbox.minX, bbox.maxY - bbox.minY);
     ctx.fillStyle = '#4a515c';
     ctx.font = `${Math.round(w * 0.022)}px -apple-system, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Upload an image', w / 2, h / 2);
+    ctx.fillText(
+      single ? 'Upload an image' : `Image ${index + 1}`,
+      bbox.minX + (bbox.maxX - bbox.minX) / 2,
+      bbox.minY + (bbox.maxY - bbox.minY) / 2
+    );
+  }
+
+  // strokeLine and drawDividers are copied verbatim from split-image/app.js.
+  function strokeLine(x1, y1, x2, y2) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = DIVIDER_THICKNESS;
+    ctx.stroke();
+  }
+
+  function drawDividers(w, h) {
+    const count = getLayout().count;
+    for (let i = 1; i < count; i++) {
+      strokeLine((w * i) / count, 0, (w * i) / count, h);
+    }
   }
 
   // The badge is locked to a corner: its rect comes only from the constants
@@ -143,100 +189,127 @@
     ctx.fillStyle = '#f0f2f5';
     ctx.fillRect(0, 0, W, H);
 
-    if (photo && photo.img) {
-      drawPanelImage(photo, getPanelRect());
-    } else {
-      drawPlaceholder();
+    const count = getLayout().count;
+    for (let i = 0; i < count; i++) {
+      const bbox = getPanelRect(i);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(bbox.minX, bbox.minY, bbox.maxX - bbox.minX, bbox.maxY - bbox.minY);
+      ctx.clip();
+      const panel = panels[i];
+      if (panel && panel.img) {
+        drawPanelImage(panel, bbox);
+      } else {
+        drawPlaceholder(bbox, i);
+      }
+      ctx.restore();
     }
 
+    drawDividers(W, H);
     drawLogo();
     drawDragHighlight();
   }
 
   function drawDragHighlight() {
     if (!fileDragOver) return;
-    const { w: W, h: H } = getDims();
+    const { w: W } = getDims();
+    const bbox = getPanelRect(dragHoverIndex === null ? 0 : dragHoverIndex);
+    const bw = bbox.maxX - bbox.minX;
+    const bh = bbox.maxY - bbox.minY;
     ctx.save();
     ctx.fillStyle = 'rgba(255, 81, 60, 0.18)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(bbox.minX, bbox.minY, bw, bh);
     ctx.strokeStyle = '#ff513c';
     ctx.lineWidth = Math.max(4, W * 0.006);
     ctx.setLineDash([W * 0.02, W * 0.012]);
-    ctx.strokeRect(ctx.lineWidth, ctx.lineWidth, W - ctx.lineWidth * 2, H - ctx.lineWidth * 2);
+    ctx.strokeRect(bbox.minX + ctx.lineWidth / 2, bbox.minY + ctx.lineWidth / 2,
+                   bw - ctx.lineWidth, bh - ctx.lineWidth);
     ctx.restore();
   }
 
-  function buildUploadSlot() {
+  function buildUploadSlots() {
+    const count = getLayout().count;
     uploadRow.innerHTML = '';
-    const slot = document.createElement('div');
-    slot.className = 'upload-slot' + (photo && photo.img ? ' has-image' : '');
+    for (let i = 0; i < count; i++) {
+      const panel = panels[i];
+      const slot = document.createElement('div');
+      slot.className = 'upload-slot' + (panel && panel.img ? ' has-image' : '');
 
-    const label = document.createElement('label');
-    label.textContent = 'Image';
-    label.htmlFor = 'file-0';
+      const label = document.createElement('label');
+      label.textContent = count === 1 ? 'Image' : `Image ${i + 1}`;
+      label.htmlFor = `file-${i}`;
 
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'image/*';
-    fileInput.className = 'file-input';
-    fileInput.id = 'file-0';
-    fileInput.addEventListener('change', onFileSelected);
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      fileInput.className = 'file-input';
+      fileInput.id = `file-${i}`;
+      fileInput.addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f) loadFile(i, f);
+      });
 
-    const zoomRow = document.createElement('div');
-    zoomRow.className = 'zoom-row';
-    const zoomLabel = document.createElement('span');
-    zoomLabel.textContent = 'Zoom';
-    const zoomSlider = document.createElement('input');
-    zoomSlider.type = 'range';
-    zoomSlider.min = '1';
-    zoomSlider.max = String(MAX_ZOOM);
-    zoomSlider.step = '0.01';
-    zoomSlider.value = String(photo && photo.img ? photo.scaleMultiplier : 1);
-    zoomSlider.disabled = !(photo && photo.img);
-    zoomSlider.addEventListener('input', (e) => {
-      if (photo) {
-        photo.scaleMultiplier = parseFloat(e.target.value);
-        render();
-      }
-    });
+      const zoomRow = document.createElement('div');
+      zoomRow.className = 'zoom-row';
+      const zoomLabel = document.createElement('span');
+      zoomLabel.textContent = 'Zoom';
+      const zoomSlider = document.createElement('input');
+      zoomSlider.type = 'range';
+      zoomSlider.min = '1';
+      zoomSlider.max = String(MAX_ZOOM);
+      zoomSlider.step = '0.01';
+      zoomSlider.value = String(panel && panel.img ? panel.scaleMultiplier : 1);
+      zoomSlider.disabled = !(panel && panel.img);
+      zoomSlider.addEventListener('input', (e) => {
+        if (panels[i]) {
+          panels[i].scaleMultiplier = parseFloat(e.target.value);
+          render();
+        }
+      });
 
-    slot.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
-      slot.classList.add('drag-over');
-    });
-    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
-    slot.addEventListener('drop', (e) => {
-      e.preventDefault();
-      slot.classList.remove('drag-over');
-      loadFile(e.dataTransfer.files && e.dataTransfer.files[0]);
-    });
+      slot.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        slot.classList.add('drag-over');
+      });
+      slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+      slot.addEventListener('drop', (e) => {
+        e.preventDefault();
+        slot.classList.remove('drag-over');
+        loadFile(i, e.dataTransfer.files && e.dataTransfer.files[0]);
+      });
 
-    zoomRow.appendChild(zoomLabel);
-    zoomRow.appendChild(zoomSlider);
-    slot.appendChild(label);
-    slot.appendChild(fileInput);
-    slot.appendChild(zoomRow);
-    uploadRow.appendChild(slot);
+      zoomRow.appendChild(zoomLabel);
+      zoomRow.appendChild(zoomSlider);
+      slot.appendChild(label);
+      slot.appendChild(fileInput);
+      slot.appendChild(zoomRow);
+      uploadRow.appendChild(slot);
+    }
   }
 
-  function onFileSelected(e) {
-    const file = e.target.files && e.target.files[0];
-    if (file) loadFile(file);
-  }
-
-  function loadFile(file) {
+  function loadFile(index, file) {
     if (!file || !file.type.startsWith('image/')) return;
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      photo = { img, scaleMultiplier: 1, panX: 0, panY: 0 };
+      panels[index] = { img, scaleMultiplier: 1, panX: 0, panY: 0 };
       URL.revokeObjectURL(url);
-      buildUploadSlot();
+      buildUploadSlots();
       render();
     };
     img.onerror = () => URL.revokeObjectURL(url);
     img.src = url;
+  }
+
+  function setLayout(value) {
+    if (!LAYOUTS[value] || value === layoutId) return;
+    layoutId = value;
+    // Keep whatever is already placed; only trim panels the layout dropped.
+    panels.length = getLayout().count;
+    updateControlsUI();
+    buildUploadSlots();
+    render();
   }
 
   function setCorner(value) {
@@ -265,12 +338,16 @@
       btn.classList.toggle('active', btn.dataset.value === current);
     });
     sync(cornerGroup, corner);
+    sync(layoutGroup, layoutId);
     sync(logoGroup, logoId);
     sync(sizeGroup, sizeMode);
   }
 
   cornerGroup.querySelectorAll('button').forEach((btn) => {
     btn.addEventListener('click', () => setCorner(btn.dataset.value));
+  });
+  layoutGroup.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => setLayout(btn.dataset.value));
   });
   logoGroup.querySelectorAll('button').forEach((btn) => {
     btn.addEventListener('click', () => setLogo(btn.dataset.value));
@@ -286,23 +363,36 @@
     return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
   }
 
-  // Dragging repositions the photo only. The badge has no hit test at all,
-  // so a drag starting on top of it still moves the photo underneath.
+  // Dragging repositions whichever photo is under the pointer. The badge has
+  // no hit test at all, so a drag starting on top of it still moves the photo
+  // underneath rather than the bug.
+  function panelIndexAt(x, y) {
+    for (let i = getLayout().count - 1; i >= 0; i--) {
+      if (pointInRect(x, y, getPanelRect(i))) return i;
+    }
+    return null;
+  }
+
   canvas.addEventListener('pointerdown', (e) => {
-    if (!photo || !photo.img) return;
     const { x, y } = clientToCanvas(e.clientX, e.clientY);
-    dragState = { startX: x, startY: y, startPanX: photo.panX, startPanY: photo.panY };
+    const i = panelIndexAt(x, y);
+    if (i === null) return;
+    const panel = panels[i];
+    if (!panel || !panel.img) return;
+    dragState = { index: i, startX: x, startY: y, startPanX: panel.panX, startPanY: panel.panY };
     canvas.setPointerCapture(e.pointerId);
   });
 
   canvas.addEventListener('pointermove', (e) => {
-    if (!dragState || !photo) return;
+    if (!dragState) return;
+    const panel = panels[dragState.index];
+    if (!panel) return;
     const { x, y } = clientToCanvas(e.clientX, e.clientY);
-    const bbox = getPanelRect();
+    const bbox = getPanelRect(dragState.index);
     const bboxW = bbox.maxX - bbox.minX;
     const bboxH = bbox.maxY - bbox.minY;
-    photo.panX = (dragState.startPanX * bboxW + (x - dragState.startX)) / bboxW;
-    photo.panY = (dragState.startPanY * bboxH + (y - dragState.startY)) / bboxH;
+    panel.panX = (dragState.startPanX * bboxW + (x - dragState.startX)) / bboxW;
+    panel.panY = (dragState.startPanY * bboxH + (y - dragState.startY)) / bboxH;
     render();
   });
 
@@ -318,15 +408,24 @@
   canvas.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-    if (!fileDragOver) { fileDragOver = true; render(); }
+    const { x, y } = clientToCanvas(e.clientX, e.clientY);
+    const i = panelIndexAt(x, y);
+    if (!fileDragOver || i !== dragHoverIndex) {
+      fileDragOver = true;
+      dragHoverIndex = i;
+      render();
+    }
   });
   canvas.addEventListener('dragleave', () => {
-    if (fileDragOver) { fileDragOver = false; render(); }
+    if (fileDragOver) { fileDragOver = false; dragHoverIndex = null; render(); }
   });
   canvas.addEventListener('drop', (e) => {
     e.preventDefault();
+    const { x, y } = clientToCanvas(e.clientX, e.clientY);
+    const i = panelIndexAt(x, y);
     fileDragOver = false;
-    loadFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+    dragHoverIndex = null;
+    loadFile(i === null ? 0 : i, e.dataTransfer.files && e.dataTransfer.files[0]);
     render();
   });
 
@@ -343,6 +442,6 @@
   });
 
   updateControlsUI();
-  buildUploadSlot();
+  buildUploadSlots();
   render();
 })();

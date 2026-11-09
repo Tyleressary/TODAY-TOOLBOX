@@ -51,7 +51,12 @@ A hub page collecting reusable layouts for recurring franchises and other editor
 
 #### Tease Image Branding Kit (`/editorial-templates/tease-image-branding-kit/`)
 
-- Single image with a branding bug composited into a bottom corner.
+- One image, or a 2-split, with a branding bug composited into a bottom corner.
+- Layout: Single Image or 2-Split. The 2-split reuses the Split Image Generator's
+  divider code verbatim (`DIVIDER_THICKNESS = 12`, a flat white stroke that is not
+  scaled to the canvas) and its strip geometry, so the centre line is the same line.
+  Verified by diffing both tools' output on the same two images: outside the bug the
+  canvases are pixel-identical at 2400×1200 and 1000×1000.
 - Output size: 2400×1200 (2:1) or 1000×1000 (1:1).
 - Logo: TODAY VAULT or TODAY 75. Every logo renders at the same size in the same place, so switching changes only the artwork.
 - Upload one image (button or drag-and-drop); it is cover-fitted to the frame, drag to reposition and use the zoom slider to scale.

@@ -1,10 +1,11 @@
 /* Page-local overrides. Shared tool-page shell lives in ../../assets/toolbox.css */
 
-/* One image for the whole frame, so a single slot rather than a grid. */
+/* One slot per panel: a single 320px slot, or two side by side when split. */
 .upload-row {
   display: grid;
-  grid-template-columns: minmax(0, 320px);
+  grid-template-columns: repeat(auto-fit, minmax(0, 320px));
   gap: 14px;
+  justify-content: center;
 }
 
 #canvas {
