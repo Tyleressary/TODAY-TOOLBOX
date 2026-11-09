@@ -115,6 +115,11 @@ Shared in `assets/toolbox.css` and used by every page.
 - **Centering**: `.card-grid` is flex-wrap with `justify-content: center`, not an
   auto-fit grid. An auto-fit grid leaves a short final row stretched or
   left-aligned; flex keeps a trailing row of one or two tiles genuinely centered.
+- **Cache busting**: every local stylesheet *and script* carries the same
+  `?v=` number, bumped together on release. Versioning only the CSS once left
+  the Tease Image Branding Kit serving new HTML against a cached older
+  `app.js`: its new Layout buttons rendered but had no handlers, so they did
+  nothing, silently, with no console error. Bump every asset or none.
 - **Card labels**: white Source Sans 3 Black (900) on every fill, per brand
   direction. White on the lighter fills (blue-500, amber-500) sits below the
   WCAG AA ratio; that is a deliberate brand call, not an oversight.
