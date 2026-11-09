@@ -38,12 +38,14 @@
   // logo renders at the same size in the same place regardless.
   const LOGOS = {
     today75: { label: 'TODAY 75', src: '../../assets/today-75-logo.png' },
+    archives: { label: 'TODAY ARCHIVES', src: '../../assets/today-archives-logo.png' },
   };
 
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   const uploadRow = document.getElementById('uploadRow');
   const cornerGroup = document.getElementById('cornerGroup');
+  const logoSelect = document.getElementById('logoSelect');
   const layoutGroup = document.getElementById('layoutGroup');
   const sizeGroup = document.getElementById('sizeGroup');
   const filenameInput = document.getElementById('filename');
@@ -67,6 +69,22 @@
     img.src = src;
     logoImages[id] = img;
   });
+
+  Object.entries(LOGOS).forEach(([id, { label }]) => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = label;
+    logoSelect.appendChild(opt);
+  });
+
+  function setLogo(value) {
+    if (!LOGOS[value] || value === logoId) return;
+    logoId = value;
+    updateControlsUI();
+    render();
+  }
+
+  logoSelect.addEventListener('change', (e) => setLogo(e.target.value));
 
   function getDims() {
     return SIZES[sizeMode];
@@ -329,6 +347,7 @@
       btn.classList.toggle('active', btn.dataset.value === current);
     });
     sync(cornerGroup, corner);
+    logoSelect.value = logoId;
     sync(layoutGroup, layoutId);
     sync(sizeGroup, sizeMode);
   }

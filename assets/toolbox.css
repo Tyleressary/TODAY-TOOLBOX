@@ -554,14 +554,16 @@ a { color: inherit; }
 .export-panel button:hover { background: var(--accent-dark); }
 .export-panel button:disabled { opacity: 0.55; cursor: not-allowed; }
 
-/* colour picker (Trivia Tease, Word Explain) */
+/* native select styling, shared by the colour pickers (Trivia Tease, Word
+   Explain) and the branding kit's logo dropdown */
 .color-row {
   display: flex;
   align-items: center;
   gap: var(--space-1);
 }
 
-.color-select {
+.color-select,
+.select-control {
   flex: 1;
   min-width: 0;
   appearance: none;
@@ -580,7 +582,8 @@ a { color: inherit; }
   background-repeat: no-repeat;
 }
 
-.color-select:hover { border-color: var(--text-dim); }
+.color-select:hover,
+.select-control:hover { border-color: var(--text-dim); }
 
 .swatch {
   width: 24px;

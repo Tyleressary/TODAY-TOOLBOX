@@ -21,3 +21,11 @@
 #canvas:active {
   cursor: grabbing;
 }
+
+/* The logo dropdown shares the colour pickers' select styling; it just needs
+   room for the longest label rather than the flex sizing a colour row gives. */
+#logoSelect {
+  min-width: 180px;
+  font-size: var(--text-sm);
+  padding: 9px 26px 9px 12px;
+}
