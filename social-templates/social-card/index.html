@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Social Card | TODAY Toolbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Bodoni:ital,wght@0,400..700;1,400..700&family=Source+Sans+3:wght@400;600;700;900&display=swap">
+<link rel="stylesheet" href="../../assets/toolbox.css?v=8">
+<link rel="stylesheet" href="style.css?v=8">
+</head>
+<body>
+  <header class="page-shell">
+    <div class="brand-band">
+      <img src="../../assets/logo.png?v=3" alt="TODAY" class="site-logo">
+      <h1 class="brand-word">Social Card</h1>
+    </div>
+    <p class="page-intro">1200&times;1500 social card &mdash; drop in an image, edit the copy, export a JPG.</p>
+  </header>
+
+  <main class="tool-main">
+    <section class="upload-row" id="uploadRow" aria-label="Image upload"></section>
+
+    <section class="copy-panel" aria-label="Copy">
+      <div class="field">
+        <label class="control-label" for="eyebrowInput">Eyebrow <span class="opt">optional</span></label>
+        <input id="eyebrowInput" type="text" value="Eyebrow text" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="control-label" for="headlineInput">Headline</label>
+        <textarea id="headlineInput" rows="3">Use Source Sans 3 Black at 65pt for Long Headlines and Keep Extended Headline Treatments Within Four Lines Maximum</textarea>
+      </div>
+      <div class="field">
+        <label class="control-label" for="dekInput">Dek <span class="opt">optional</span></label>
+        <textarea id="dekInput" rows="2">The dek goes here when needed and it&rsquo;s in Source Sans 3 Medium, 50pt</textarea>
+      </div>
+      <p class="size-note" id="sizeNote"></p>
+    </section>
+
+    <section class="layout-panel" aria-label="Gradient">
+      <div class="control-group">
+        <label class="control-label" for="rampSelect">Gradient colour</label>
+        <select class="select-control" id="rampSelect">
+          <option value="auto" selected>Auto (from image)</option>
+          <option value="red">Red</option>
+          <option value="purple">Purple</option>
+          <option value="blue">Blue</option>
+          <option value="amber">Amber</option>
+          <option value="green">Green</option>
+          <option value="gray">Gray</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label class="control-label" for="gradStart">Start</label>
+        <input id="gradStart" type="range" min="0.15" max="0.8" step="0.005" value="0.475">
+      </div>
+      <div class="control-group">
+        <label class="control-label" for="gradNeutralise">Neutralise</label>
+        <input id="gradNeutralise" type="range" min="0" max="1" step="0.01" value="0.70">
+      </div>
+      <div class="control-group">
+        <label class="control-label" for="gradOpacity">Opacity</label>
+        <input id="gradOpacity" type="range" min="0.2" max="1" step="0.01" value="1">
+      </div>
+      <div class="control-group">
+        <label class="control-label" for="gradSoftness">Transition</label>
+        <input id="gradSoftness" type="range" min="0.6" max="2.2" step="0.05" value="1.15">
+      </div>
+    </section>
+
+    <section class="canvas-wrap">
+      <canvas id="canvas" width="1200" height="1500"></canvas>
+    </section>
+
+    <section class="export-panel" aria-label="Export">
+      <label for="filename">File name</label>
+      <input id="filename" type="text" placeholder="social-card" autocomplete="off">
+      <button type="button" id="downloadBtn">Download JPG</button>
+    </section>
+
+    <div class="center-row">
+      <a class="home-link" href="../index.html">
+        <span class="home-link-arrow" aria-hidden="true">&larr;</span>
+        <span class="home-link-word">Social Templates</span>
+      </a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>TODAY Toolbox &mdash; internal team tools</p>
+  </footer>
+
+  <script src="app.js?v=8"></script>
+</body>
+</html>

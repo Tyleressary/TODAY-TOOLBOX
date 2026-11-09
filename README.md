@@ -108,8 +108,40 @@ New templates are added as subfolders here and linked from the hub page.
 
 ### Social Templates (`/social-templates/`)
 
-Empty for now. The page exists so the category is present in the navigation and
-new social templates can be added as subfolders without restructuring the home page.
+#### Social Card (`/social-templates/social-card/`)
+
+Recreates the Figma social card frame as a reusable template: drop in an image,
+edit the copy, export a 1200×1500 JPG.
+
+- Layout is measured from the supplied reference, not estimated. Text box is
+  1000px wide and centred; at the reference copy the rendered baselines match
+  Figma exactly — headline 1009/1074/1139/1204, dek 1276.5/1331.5, eyebrow 932,
+  logo 247×34 at y1417.
+- Type: eyebrow Source Sans 3 Black 38px/95%/+4% uppercase; headline Black
+  100%/+1%; dek Medium 50px/110%/−2%. All white, centred, bottom-anchored.
+- **Headline auto-sizes between 90px and 65px.** It takes the largest size whose
+  block is at most three lines *and* stays below the card's vertical centre.
+  Shrinking fits more characters per line, so longer copy needs a smaller size to
+  reach three lines — that is what makes the size fall as copy grows. Copy that
+  cannot reach three lines even at 65px falls back to 65 (which is what the Figma
+  reference itself is: four lines at 65px). If it still will not fit above the
+  centre, the UI warns rather than clipping or shrinking further.
+- Eyebrow and dek are optional; leaving either empty collapses it and its gap.
+- **Gradient is derived from the image.** The dominant colour of the band the
+  gradient covers is pulled 70% toward `--gray-600`, so a blue image gives a blue
+  slate and a warm one a warm slate, while the pull toward the brand neutral keeps
+  white text readable on any photo. That rule was back-solved from the reference,
+  whose bottom is exactly its own `--blue-200` mixed ~0.69 toward gray-600.
+  Snapping to a palette *step* was rejected: the blue, amber and red ramps top out
+  far too light for white text. Colour (auto or a ramp), start, neutralise,
+  opacity and transition are all adjustable.
+- Canvas type uses `'Source Sans 3 Canvas'`, self-hosted at
+  `assets/fonts/SourceSans3-Variable-latin.woff2` (one variable file covers both
+  weights). Canvas text must not depend on a runtime font fetch — a fallback would
+  silently export off-brand type — which is why Mada is self-hosted too. The UI's
+  Google-hosted Source Sans 3 is a separate family and is unaffected.
+- The white lockup at `assets/logo-white.png` is `logo.png` with every opaque
+  pixel painted white; the arc's ring gaps are already transparent, so they survive.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
 
