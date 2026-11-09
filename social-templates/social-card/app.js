@@ -32,9 +32,15 @@
 
   // Gradient, decomposed from the reference: it begins 47.5% down and reaches
   // the image's own colour pulled 70% toward --gray-600 at the bottom.
-  // softness is the exponent on the ramp: the reference eases in rather than
-  // running linear, which measured at about t^1.15.
-  const GRAD_DEFAULTS = { start: 0.475, neutralise: 0.70, opacity: 1, softness: 1.15 };
+  // Three knobs only. Strength drives how far the colour is pulled toward the
+  // brand neutral and how opaque it gets; height is how far up the card it
+  // reaches. The easing exponent is fixed at the 1.15 the reference measures.
+  const SOFTNESS = 1.15;
+  const GRAD_DEFAULTS = { strength: 0.70, height: 0.525 };
+
+  function gradStart() { return 1 - grad.height; }
+  function gradNeutralise() { return grad.strength; }
+  function gradOpacity() { return Math.min(1, 0.55 + 0.65 * grad.strength); }
   const NEUTRAL = [0x36, 0x3b, 0x43]; // --gray-600
 
   const RAMPS = {
@@ -50,18 +56,22 @@
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   const uploadRow = document.getElementById('uploadRow');
-  const eyebrowInput = document.getElementById('eyebrowInput');
-  const headlineInput = document.getElementById('headlineInput');
-  const dekInput = document.getElementById('dekInput');
+  const stage = document.getElementById('stage');
+  const EDIT = {
+    eyebrow: document.getElementById('edEyebrow'),
+    headline: document.getElementById('edHeadline'),
+    dek: document.getElementById('edDek'),
+  };
   const rampSelect = document.getElementById('rampSelect');
-  const startRange = document.getElementById('gradStart');
-  const neutralRange = document.getElementById('gradNeutralise');
-  const opacityRange = document.getElementById('gradOpacity');
-  const softRange = document.getElementById('gradSoftness');
+  const strengthRange = document.getElementById('gradStrength');
+  const heightRange = document.getElementById('gradHeight');
+  const eyebrowToggle = document.getElementById('eyebrowToggle');
+  const dekToggle = document.getElementById('dekToggle');
   const sizeNote = document.getElementById('sizeNote');
   const filenameInput = document.getElementById('filename');
   const downloadBtn = document.getElementById('downloadBtn');
 
+  const shown = { eyebrow: true, dek: true };
   let photo = null; // { img, scaleMultiplier, panX, panY }
   let dragState = null;
   let fileDragOver = false;
@@ -80,6 +90,35 @@
   ]).then(() => { fontsReady = true; render(); });
 
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+  function readEditable(el) {
+    return (el.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  // Lays each editable box exactly over the type the canvas draws, so the
+  // caret and selection land where the glyphs are. The text itself is
+  // transparent -- the canvas underneath is what you actually see, which keeps
+  // the preview and the exported JPG the same renderer.
+  function placeEditable(el, lines, baselines, weight, size, leading, tracking, visible) {
+    if (!visible) { el.hidden = true; return; }
+    el.hidden = false;
+    const m = metrics(weight, size);
+    const lineH = size * leading;
+    const count = Math.max(1, lines.length);
+    const firstBaseline = baselines.length ? baselines[0] : H - 200;
+    // CSS puts half the leading above the ascent; undo that to hit the baseline.
+    const top = firstBaseline - m.fontAscent - (lineH - (m.fontAscent + m.fontDescent)) / 2;
+    Object.assign(el.style, {
+      left: `${(W - BOX_W) / 2}px`,
+      width: `${BOX_W}px`,
+      top: `${top}px`,
+      height: `${lineH * count}px`,
+      fontWeight: String(weight),
+      fontSize: `${size}px`,
+      lineHeight: `${lineH}px`,
+      letterSpacing: `${(tracking * size).toFixed(2)}px`,
+    });
+  }
 
   function getPanelRect() {
     return { minX: 0, maxX: W, minY: 0, maxY: H };
@@ -118,29 +157,62 @@
     ctx.letterSpacing = `${(em * size).toFixed(2)}px`;
   }
 
+  // Splits a token that is itself wider than the box. Without this a single
+  // long word never breaks and runs straight off both edges of the card.
+  function breakLongWord(word, maxWidth) {
+    const pieces = [];
+    let piece = '';
+    for (const ch of word) {
+      if (piece && ctx.measureText(piece + ch).width > maxWidth) {
+        pieces.push(piece);
+        piece = ch;
+      } else {
+        piece += ch;
+      }
+    }
+    if (piece) pieces.push(piece);
+    return pieces;
+  }
+
   function wrap(text, weight, size, tracking, maxWidth) {
     setFont(weight, size);
     setTracking(tracking, size);
     const words = text.split(/\s+/).filter(Boolean);
     if (!words.length) return [];
     const lines = [];
-    let line = words[0];
-    for (let i = 1; i < words.length; i++) {
-      const next = `${line} ${words[i]}`;
-      if (ctx.measureText(next).width <= maxWidth) line = next;
-      else { lines.push(line); line = words[i]; }
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (ctx.measureText(candidate).width <= maxWidth) { line = candidate; continue; }
+      if (line) { lines.push(line); line = ''; }
+      if (ctx.measureText(word).width <= maxWidth) { line = word; continue; }
+      const pieces = breakLongWord(word, maxWidth);
+      lines.push(...pieces.slice(0, -1));
+      line = pieces[pieces.length - 1] || '';
     }
-    lines.push(line);
+    if (line) lines.push(line);
     return lines;
+  }
+
+  // Font metrics for the overlay's half-leading maths.
+  function metrics(weight, size) {
+    setFont(weight, size);
+    const m = ctx.measureText('Hg');
+    return {
+      ascent: m.actualBoundingBoxAscent || size * 0.75,
+      descent: m.actualBoundingBoxDescent || size * 0.21,
+      fontAscent: m.fontBoundingBoxAscent || size * 0.8,
+      fontDescent: m.fontBoundingBoxDescent || size * 0.2,
+    };
   }
 
   /* ---------- layout ---------- */
 
   // Builds the bottom-anchored stack and reports where its top edge lands.
   function layout(size) {
-    const eyebrowText = eyebrowInput.value.trim().toUpperCase();
-    const headlineText = headlineInput.value.trim();
-    const dekText = dekInput.value.trim();
+    const eyebrowText = shown.eyebrow ? readEditable(EDIT.eyebrow).toUpperCase() : '';
+    const headlineText = readEditable(EDIT.headline);
+    const dekText = shown.dek ? readEditable(EDIT.dek) : '';
 
     const headLines = wrap(headlineText, 900, size, HEADLINE.tracking, BOX_W);
     const dekLines = dekText ? wrap(dekText, 500, DEK.size, DEK.tracking, BOX_W) : [];
@@ -153,26 +225,31 @@
     // Walk upward from the logo.
     let dekBaselines = [];
     let cursor;
-    if (dekLines.length) {
+    if (dekLines.length || (shown.dek && !dekText)) {
+      const n = Math.max(1, dekLines.length);
       const lastDekBaseline = logoTop - GAP_DEK_LOGO;
-      for (let i = dekLines.length - 1; i >= 0; i--) {
-        dekBaselines[i] = lastDekBaseline - (dekLines.length - 1 - i) * DEK.size * DEK.leading;
+      for (let i = n - 1; i >= 0; i--) {
+        dekBaselines[i] = lastDekBaseline - (n - 1 - i) * DEK.size * DEK.leading;
       }
       cursor = dekBaselines[0] - GAP_HEAD_DEK;
     } else {
       cursor = logoTop - GAP_DEK_LOGO;
     }
 
+    // An empty headline still reserves one line, so there is always somewhere
+    // to click to start typing.
     const headBaselines = [];
-    for (let i = headLines.length - 1; i >= 0; i--) {
-      headBaselines[i] = cursor - (headLines.length - 1 - i) * size * HEADLINE.leading;
+    const headCount = Math.max(1, headLines.length);
+    for (let i = headCount - 1; i >= 0; i--) {
+      headBaselines[i] = cursor - (headCount - 1 - i) * size * HEADLINE.leading;
     }
 
     const eyeBaselines = [];
-    if (eyeLines.length) {
+    if (eyeLines.length || (shown.eyebrow && !eyebrowText)) {
+      const n = Math.max(1, eyeLines.length);
       const lastEye = (headBaselines[0] ?? cursor) - GAP_EYE_HEAD;
-      for (let i = eyeLines.length - 1; i >= 0; i--) {
-        eyeBaselines[i] = lastEye - (eyeLines.length - 1 - i) * EYEBROW.size * EYEBROW.leading;
+      for (let i = n - 1; i >= 0; i--) {
+        eyeBaselines[i] = lastEye - (n - 1 - i) * EYEBROW.size * EYEBROW.leading;
       }
     }
 
@@ -220,7 +297,7 @@
     const { drawW, drawH, panXpx, panYpx } = panelImageMetrics(photo, bbox);
     const cx = W / 2 + panXpx, cy = H / 2 + panYpx;
     const scale = drawW / photo.img.width;
-    const bandTop = grad.start * H;
+    const bandTop = gradStart() * H;
     const sx = (0 - (cx - drawW / 2)) / scale;
     const sy = (bandTop - (cy - drawH / 2)) / scale;
     const sw = W / scale, sh = (H - bandTop) / scale;
@@ -235,18 +312,19 @@
   function gradientColour() {
     const picked = RAMPS[rampSelect.value];
     const base = picked || dominantColour();
-    const t = grad.neutralise;
+    const t = gradNeutralise();
     return base.map((c, i) => Math.round(c + (NEUTRAL[i] - c) * t));
   }
 
   function drawGradient() {
     const [r, g, b] = gradientColour();
-    const startY = grad.start * H;
+    const startY = gradStart() * H;
     const gr = ctx.createLinearGradient(0, startY, 0, H);
     // A few eased stops rather than one linear ramp, so the onset stays soft.
     const stops = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1];
+    const op = gradOpacity();
     stops.forEach((p) => {
-      const a = Math.pow(p, grad.softness) * grad.opacity;
+      const a = Math.pow(p, SOFTNESS) * op;
       gr.addColorStop(p, `rgba(${r}, ${g}, ${b}, ${a})`);
     });
     ctx.fillStyle = gr;
@@ -293,7 +371,24 @@
     }
 
     drawDragHighlight();
+    syncEditables(l);
     reportSize(l);
+  }
+
+  // Keeps the overlay's pixel grid locked to the canvas's displayed size.
+  function syncScale() {
+    const shownW = canvas.clientWidth || W;
+    stage.style.setProperty('--card-scale', String(shownW / W));
+  }
+
+  function syncEditables(l) {
+    syncScale();
+    placeEditable(EDIT.eyebrow, l.eyeLines, l.eyeBaselines, 900, EYEBROW.size,
+      EYEBROW.leading, EYEBROW.tracking, shown.eyebrow);
+    placeEditable(EDIT.headline, l.headLines, l.headBaselines, 900, l.size,
+      HEADLINE.leading, HEADLINE.tracking, true);
+    placeEditable(EDIT.dek, l.dekLines, l.dekBaselines, 500, DEK.size,
+      DEK.leading, DEK.tracking, shown.dek);
   }
 
   function reportSize(l) {
@@ -382,13 +477,35 @@
 
   /* ---------- controls ---------- */
 
-  [eyebrowInput, headlineInput, dekInput].forEach((el) =>
-    el.addEventListener('input', render));
   rampSelect.addEventListener('change', render);
-  startRange.addEventListener('input', (e) => { grad.start = parseFloat(e.target.value); render(); });
-  neutralRange.addEventListener('input', (e) => { grad.neutralise = parseFloat(e.target.value); render(); });
-  opacityRange.addEventListener('input', (e) => { grad.opacity = parseFloat(e.target.value); render(); });
-  softRange.addEventListener('input', (e) => { grad.softness = parseFloat(e.target.value); render(); });
+  strengthRange.addEventListener('input', (e) => { grad.strength = parseFloat(e.target.value); render(); });
+  heightRange.addEventListener('input', (e) => { grad.height = parseFloat(e.target.value); render(); });
+
+  eyebrowToggle.addEventListener('change', () => {
+    shown.eyebrow = eyebrowToggle.checked;
+    if (shown.eyebrow) EDIT.eyebrow.focus();
+    render();
+  });
+  dekToggle.addEventListener('change', () => {
+    shown.dek = dekToggle.checked;
+    if (shown.dek) EDIT.dek.focus();
+    render();
+  });
+
+  // Typing never rewrites the editable's own content, so the caret is never
+  // disturbed; render only reads from it and repaints the canvas beneath.
+  Object.values(EDIT).forEach((el) => {
+    el.addEventListener('input', render);
+    el.addEventListener('focus', () => stage.classList.add('is-editing'));
+    el.addEventListener('blur', () => { stage.classList.remove('is-editing'); render(); });
+    // Keep it plain text: no pasted markup, no newlines (wrapping is automatic).
+    el.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const t = (e.clipboardData || window.clipboardData).getData('text').replace(/\s+/g, ' ');
+      document.execCommand('insertText', false, t);
+    });
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+  });
 
   function clientToCanvas(cx, cy) {
     const r = canvas.getBoundingClientRect();
@@ -438,6 +555,9 @@
   });
 
   window.__card = { layout: chooseLayout, grad, gradientColour };
+
+  if (window.ResizeObserver) new ResizeObserver(syncScale).observe(canvas);
+  window.addEventListener('resize', syncScale);
 
   buildUploadSlot();
   render();

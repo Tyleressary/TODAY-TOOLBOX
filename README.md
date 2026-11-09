@@ -126,15 +126,25 @@ edit the copy, export a 1200×1500 JPG.
   cannot reach three lines even at 65px falls back to 65 (which is what the Figma
   reference itself is: four lines at 65px). If it still will not fit above the
   centre, the UI warns rather than clipping or shrinking further.
-- Eyebrow and dek are optional; leaving either empty collapses it and its gap.
+- **Text is edited in place.** Clicking any line on the card puts a caret in it;
+  typing repaints the canvas live. The editable boxes are a transparent overlay
+  laid exactly over the type the canvas draws, scaled from canvas pixels to the
+  displayed size, so the canvas stays the single renderer and the preview and the
+  exported JPG can never diverge. There are no separate copy fields.
+- Wrapping is automatic at the 1000px box, and a word wider than the box is
+  broken mid-word — without that a single long token never wraps and runs off
+  both edges of the card.
+- Eyebrow and dek are optional; the Show toggles collapse them and their gaps.
 - **Gradient is derived from the image.** The dominant colour of the band the
   gradient covers is pulled 70% toward `--gray-600`, so a blue image gives a blue
   slate and a warm one a warm slate, while the pull toward the brand neutral keeps
   white text readable on any photo. That rule was back-solved from the reference,
   whose bottom is exactly its own `--blue-200` mixed ~0.69 toward gray-600.
   Snapping to a palette *step* was rejected: the blue, amber and red ramps top out
-  far too light for white text. Colour (auto or a ramp), start, neutralise,
-  opacity and transition are all adjustable.
+  far too light for white text. Three controls only — **Colour** (auto or a ramp),
+  **Strength** (drives both how far the colour is pulled toward the neutral and how
+  opaque it gets) and **Height** (how far up the card it reaches). The easing
+  exponent is fixed at the 1.15 the reference measures.
 - Canvas type uses `'Source Sans 3 Canvas'`, self-hosted at
   `assets/fonts/SourceSans3-Variable-latin.woff2` (one variable file covers both
   weights). Canvas text must not depend on a runtime font fetch — a fallback would

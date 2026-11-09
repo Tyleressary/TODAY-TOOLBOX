@@ -7,46 +7,6 @@
   justify-content: center;
 }
 
-.copy-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  width: 100%;
-  max-width: 640px;
-  margin: 0 auto;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4) var(--space-4);
-}
-
-.copy-panel .field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.copy-panel .opt {
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 400;
-  color: var(--text-dim);
-}
-
-.copy-panel input[type="text"],
-.copy-panel textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-ui);
-  font-size: var(--text-base);
-  line-height: 1.4;
-  resize: vertical;
-}
-
 /* Reports the size the headline settled on, or warns when copy will not fit. */
 .size-note {
   margin: 0;
@@ -76,3 +36,89 @@
 }
 
 #canvas:active { cursor: grabbing; }
+
+/* ===================================================================
+   The card stage: canvas renders everything, and a layer of editable
+   boxes sits exactly over the type so it can be edited in place. The
+   editable text itself is transparent -- what you see is the canvas
+   underneath, so the preview and the exported JPG share one renderer.
+   =================================================================== */
+
+.card-stage {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  overflow: hidden;
+  /* The overlay is laid out in real canvas pixels and scaled down to the
+     displayed size. CSS cannot divide px by px into the unitless number
+     scale() needs, so app.js sets this from the canvas's rendered width. */
+  --card-scale: 1;
+}
+
+.card-stage #canvas {
+  display: block;
+  width: 100%;
+  max-width: none;
+}
+
+.edit-layer {
+  position: absolute;
+  inset: 0;
+  width: 1200px;
+  height: 1500px;
+  transform: scale(var(--card-scale));
+  transform-origin: top left;
+  pointer-events: none;
+}
+
+.edit-text {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  font-family: 'Source Sans 3 Canvas', var(--font-ui);
+  text-align: center;
+  color: transparent;
+  caret-color: #ffffff;
+  outline: none;
+  cursor: text;
+  pointer-events: auto;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  border-radius: 4px;
+}
+
+.edit-text::selection { background: rgba(255, 255, 255, 0.38); }
+
+.edit-text:hover { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45); }
+
+.edit-text:focus {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+/* Empty blocks keep a visible target, so there is always somewhere to click. */
+.edit-text:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.edit-hint {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.toggle-row {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.toggle-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.toggle-row input { accent-color: var(--accent); }

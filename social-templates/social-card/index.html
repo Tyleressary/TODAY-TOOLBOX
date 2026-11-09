@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Bodoni:ital,wght@0,400..700;1,400..700&family=Source+Sans+3:wght@400;600;700;900&display=swap">
-<link rel="stylesheet" href="../../assets/toolbox.css?v=8">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="../../assets/toolbox.css?v=9">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <header class="page-shell">
@@ -16,31 +16,15 @@
       <img src="../../assets/logo.png?v=3" alt="TODAY" class="site-logo">
       <h1 class="brand-word">Social Card</h1>
     </div>
-    <p class="page-intro">1200&times;1500 social card &mdash; drop in an image, edit the copy, export a JPG.</p>
+    <p class="page-intro">1200&times;1500 social card &mdash; drop in an image, click the card to edit the copy, export a JPG.</p>
   </header>
 
   <main class="tool-main">
     <section class="upload-row" id="uploadRow" aria-label="Image upload"></section>
 
-    <section class="copy-panel" aria-label="Copy">
-      <div class="field">
-        <label class="control-label" for="eyebrowInput">Eyebrow <span class="opt">optional</span></label>
-        <input id="eyebrowInput" type="text" value="Eyebrow text" autocomplete="off">
-      </div>
-      <div class="field">
-        <label class="control-label" for="headlineInput">Headline</label>
-        <textarea id="headlineInput" rows="3">Use Source Sans 3 Black at 65pt for Long Headlines and Keep Extended Headline Treatments Within Four Lines Maximum</textarea>
-      </div>
-      <div class="field">
-        <label class="control-label" for="dekInput">Dek <span class="opt">optional</span></label>
-        <textarea id="dekInput" rows="2">The dek goes here when needed and it&rsquo;s in Source Sans 3 Medium, 50pt</textarea>
-      </div>
-      <p class="size-note" id="sizeNote"></p>
-    </section>
-
     <section class="layout-panel" aria-label="Gradient">
       <div class="control-group">
-        <label class="control-label" for="rampSelect">Gradient colour</label>
+        <label class="control-label" for="rampSelect">Colour</label>
         <select class="select-control" id="rampSelect">
           <option value="auto" selected>Auto (from image)</option>
           <option value="red">Red</option>
@@ -52,26 +36,38 @@
         </select>
       </div>
       <div class="control-group">
-        <label class="control-label" for="gradStart">Start</label>
-        <input id="gradStart" type="range" min="0.15" max="0.8" step="0.005" value="0.475">
+        <label class="control-label" for="gradStrength">Strength</label>
+        <input id="gradStrength" type="range" min="0" max="1" step="0.01" value="0.70">
       </div>
       <div class="control-group">
-        <label class="control-label" for="gradNeutralise">Neutralise</label>
-        <input id="gradNeutralise" type="range" min="0" max="1" step="0.01" value="0.70">
+        <label class="control-label" for="gradHeight">Height</label>
+        <input id="gradHeight" type="range" min="0.2" max="0.85" step="0.005" value="0.525">
       </div>
       <div class="control-group">
-        <label class="control-label" for="gradOpacity">Opacity</label>
-        <input id="gradOpacity" type="range" min="0.2" max="1" step="0.01" value="1">
-      </div>
-      <div class="control-group">
-        <label class="control-label" for="gradSoftness">Transition</label>
-        <input id="gradSoftness" type="range" min="0.6" max="2.2" step="0.05" value="1.15">
+        <span class="control-label">Show</span>
+        <div class="toggle-row">
+          <label><input type="checkbox" id="eyebrowToggle" checked> Eyebrow</label>
+          <label><input type="checkbox" id="dekToggle" checked> Dek</label>
+        </div>
       </div>
     </section>
 
     <section class="canvas-wrap">
-      <canvas id="canvas" width="1200" height="1500"></canvas>
+      <div class="card-stage" id="stage">
+        <canvas id="canvas" width="1200" height="1500"></canvas>
+        <div class="edit-layer">
+          <div class="edit-text" id="edEyebrow" contenteditable="plaintext-only"
+               role="textbox" aria-label="Eyebrow" data-placeholder="Eyebrow">Eyebrow text</div>
+          <div class="edit-text" id="edHeadline" contenteditable="plaintext-only"
+               role="textbox" aria-label="Headline" data-placeholder="Click to add a headline">Use Source Sans 3 Black at 65pt for Long Headlines and Keep Extended Headline Treatments Within Four Lines Maximum</div>
+          <div class="edit-text" id="edDek" contenteditable="plaintext-only"
+               role="textbox" aria-label="Dek" data-placeholder="Dek">The dek goes here when needed and it’s in Source Sans 3 Medium, 50pt</div>
+        </div>
+      </div>
     </section>
+
+    <p class="edit-hint">Click any text on the card to edit it.</p>
+    <p class="size-note" id="sizeNote"></p>
 
     <section class="export-panel" aria-label="Export">
       <label for="filename">File name</label>
@@ -91,6 +87,6 @@
     <p>TODAY Toolbox &mdash; internal team tools</p>
   </footer>
 
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>
