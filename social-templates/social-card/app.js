@@ -5,7 +5,10 @@
   const H = 1500;
   const MAX_ZOOM = 3;
 
-  const FONT = "'Source Sans 3 Canvas'";
+  // Canvas-only families, self-hosted. Canvas text must not depend on a
+  // runtime font fetch: a fallback face would silently export off-brand type.
+  const SANS = "'Source Sans 3 Canvas'";
+  const SERIF = "'Libre Bodoni Canvas'";
 
   // Every number below was measured off the supplied Figma reference card at
   // 1200x1500, not estimated. Text box is 1000 wide, centred (the widest
@@ -16,9 +19,31 @@
   // The headline may never cross the card's vertical centre.
   const TOP_LIMIT = H / 2;
 
-  const EYEBROW = { size: 38, leading: 0.95, tracking: 0.04 };
-  const DEK = { size: 50, leading: 1.10, tracking: -0.02 };
-  const HEADLINE = { min: 65, max: 90, leading: 1.00, tracking: 0.01 };
+  const EYEBROW = { family: SANS, weight: 900, size: 38, leading: 0.95, tracking: 0.04 };
+  const DEK = { family: SANS, weight: 500, size: 50, leading: 1.10, tracking: -0.02 };
+
+  // Two headline styles. The sans one auto-sizes 90..65 under the rule in
+  // chooseLayout(); the serif one is pinned at the size its Figma panel
+  // specifies, so copy that will not fit warns rather than being resized.
+  //
+  // gapEye / gapDek are baseline-to-baseline, so they cannot simply be shared:
+  // the reference's 77 and 72.5 were measured against a 65px Source Sans
+  // headline whose caps rise 43px, and Libre Bodoni's rise 76px at 100px, so
+  // reusing them runs the headline straight into the eyebrow. The serif values
+  // below are set to reproduce the reference's *visual* clearances exactly --
+  // 34px from the eyebrow's baseline to the headline's cap top, and 22.5px
+  // from the headline's descender to the dek's cap top -- against measured
+  // Bodoni metrics (cap 76, descender 33 at 100px; dek ascent 36 at 50px).
+  const HEAD_STYLES = {
+    sans: { label: 'Source Sans 3', family: SANS, weight: 900,
+            min: 65, max: 90, leading: 1.00, tracking: 0.01,
+            gapEye: 77, gapDek: 72.5 },
+    serif: { label: 'Libre Bodoni', family: SERIF, weight: 700,
+             fixed: 100, leading: 1.14, tracking: -0.01,
+             gapEye: 110, gapDek: 91.5 },
+  };
+  let headKey = 'sans';
+  function headStyle() { return HEAD_STYLES[headKey]; }
 
   // Bottom-anchored gaps, measured from the reference.
   // Back-solved from the reference's two most reliable baselines: headline
@@ -27,8 +52,7 @@
   const LOGO_BOTTOM_MARGIN = 49;   // card bottom -> logo bottom (logo top 1417)
   const LOGO_WIDTH = 247;          // logo renders 247 x 34
   const GAP_DEK_LOGO = 85.5;       // dek last baseline -> logo top
-  const GAP_HEAD_DEK = 72.5;       // headline last baseline -> dek first baseline
-  const GAP_EYE_HEAD = 77;         // eyebrow baseline -> headline first baseline
+                                   // (independent of the headline's face)
 
   // Gradient, decomposed from the reference: it begins 47.5% down and reaches
   // the image's own colour pulled 70% toward --gray-600 at the bottom.
@@ -52,6 +76,8 @@
     headline: document.getElementById('edHeadline'),
     dek: document.getElementById('edDek'),
   };
+  const fontSelect = document.getElementById('fontSelect');
+  const gradToggle = document.getElementById('gradToggle');
   const dropperBtn = document.getElementById('dropperBtn');
   const colourDot = document.getElementById('colourDot');
   const colourText = document.getElementById('colourText');
@@ -69,7 +95,7 @@
   const filenameInput = document.getElementById('filename');
   const downloadBtn = document.getElementById('downloadBtn');
 
-  const shown = { eyebrow: true, dek: true };
+  const shown = { eyebrow: true, dek: true, gradient: true };
   let photo = null; // { img, scaleMultiplier, panX, panY }
   let dragState = null;
   let fileDragOver = false;
@@ -89,8 +115,9 @@
   // Canvas text needs the real face before the first measurement, or wrapping
   // and auto-sizing would be computed against a fallback.
   Promise.all([
-    document.fonts.load(`900 100px ${FONT}`),
-    document.fonts.load(`500 100px ${FONT}`),
+    document.fonts.load(`900 100px ${SANS}`),
+    document.fonts.load(`500 100px ${SANS}`),
+    document.fonts.load(`700 100px ${SERIF}`),
   ]).then(() => { fontsReady = true; render(); });
 
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
@@ -103,10 +130,10 @@
   // caret and selection land where the glyphs are. The text itself is
   // transparent -- the canvas underneath is what you actually see, which keeps
   // the preview and the exported JPG the same renderer.
-  function placeEditable(el, lines, baselines, weight, size, leading, tracking, visible) {
+  function placeEditable(el, lines, baselines, family, weight, size, leading, tracking, visible) {
     if (!visible) { el.hidden = true; return; }
     el.hidden = false;
-    const m = metrics(weight, size);
+    const m = metrics(family, weight, size);
     const lineH = size * leading;
     const count = Math.max(1, lines.length);
     const firstBaseline = baselines.length ? baselines[0] : H - 200;
@@ -117,6 +144,7 @@
       width: `${BOX_W}px`,
       top: `${top}px`,
       height: `${lineH * count}px`,
+      fontFamily: family,
       fontWeight: String(weight),
       fontSize: `${size}px`,
       lineHeight: `${lineH}px`,
@@ -154,8 +182,8 @@
 
   /* ---------- text measuring ---------- */
 
-  function setFont(weight, size) {
-    ctx.font = `${weight} ${size}px ${FONT}`;
+  function setFont(family, weight, size) {
+    ctx.font = `${weight} ${size}px ${family}`;
   }
 
   // Canvas letterSpacing is honoured by Chrome/Edge; where it is not, the
@@ -181,8 +209,8 @@
     return pieces;
   }
 
-  function wrap(text, weight, size, tracking, maxWidth) {
-    setFont(weight, size);
+  function wrap(text, family, weight, size, tracking, maxWidth) {
+    setFont(family, weight, size);
     setTracking(tracking, size);
     const words = text.split(/\s+/).filter(Boolean);
     if (!words.length) return [];
@@ -202,8 +230,8 @@
   }
 
   // Font metrics for the overlay's half-leading maths.
-  function metrics(weight, size) {
-    setFont(weight, size);
+  function metrics(family, weight, size) {
+    setFont(family, weight, size);
     const m = ctx.measureText('Hg');
     return {
       ascent: m.actualBoundingBoxAscent || size * 0.75,
@@ -221,9 +249,11 @@
     const headlineText = readEditable(EDIT.headline);
     const dekText = shown.dek ? readEditable(EDIT.dek) : '';
 
-    const headLines = wrap(headlineText, 900, size, HEADLINE.tracking, BOX_W);
-    const dekLines = dekText ? wrap(dekText, 500, DEK.size, DEK.tracking, BOX_W) : [];
-    const eyeLines = eyebrowText ? wrap(eyebrowText, 900, EYEBROW.size, EYEBROW.tracking, BOX_W) : [];
+    const hs = headStyle();
+    const headLines = wrap(headlineText, hs.family, hs.weight, size, hs.tracking, BOX_W);
+    const dekLines = dekText ? wrap(dekText, DEK.family, DEK.weight, DEK.size, DEK.tracking, BOX_W) : [];
+    const eyeLines = eyebrowText
+      ? wrap(eyebrowText, EYEBROW.family, EYEBROW.weight, EYEBROW.size, EYEBROW.tracking, BOX_W) : [];
 
     const logoH = Math.round(LOGO_WIDTH * (logoImg.height || 98) / (logoImg.width || 720));
     const logoBottom = H - LOGO_BOTTOM_MARGIN;
@@ -238,7 +268,7 @@
       for (let i = n - 1; i >= 0; i--) {
         dekBaselines[i] = lastDekBaseline - (n - 1 - i) * DEK.size * DEK.leading;
       }
-      cursor = dekBaselines[0] - GAP_HEAD_DEK;
+      cursor = dekBaselines[0] - hs.gapDek;
     } else {
       cursor = logoTop - GAP_DEK_LOGO;
     }
@@ -248,13 +278,13 @@
     const headBaselines = [];
     const headCount = Math.max(1, headLines.length);
     for (let i = headCount - 1; i >= 0; i--) {
-      headBaselines[i] = cursor - (headCount - 1 - i) * size * HEADLINE.leading;
+      headBaselines[i] = cursor - (headCount - 1 - i) * size * hs.leading;
     }
 
     const eyeBaselines = [];
     if (eyeLines.length || (shown.eyebrow && !eyebrowText)) {
       const n = Math.max(1, eyeLines.length);
-      const lastEye = (headBaselines[0] ?? cursor) - GAP_EYE_HEAD;
+      const lastEye = (headBaselines[0] ?? cursor) - hs.gapEye;
       for (let i = n - 1; i >= 0; i--) {
         eyeBaselines[i] = lastEye - (n - 1 - i) * EYEBROW.size * EYEBROW.leading;
       }
@@ -262,9 +292,10 @@
 
     // Top edge = ink top of the topmost line (ascender, not baseline).
     const topBaseline = eyeBaselines.length ? eyeBaselines[0] : headBaselines[0];
-    const topSize = eyeBaselines.length ? EYEBROW.size : size;
-    const topWeight = 900;
-    setFont(topWeight, topSize);
+    const topIsEyebrow = eyeBaselines.length > 0;
+    const topSize = topIsEyebrow ? EYEBROW.size : size;
+    setFont(topIsEyebrow ? EYEBROW.family : hs.family,
+            topIsEyebrow ? EYEBROW.weight : hs.weight, topSize);
     const probe = ctx.measureText(eyeBaselines.length ? (eyeLines[0] || 'H') : (headLines[0] || 'H'));
     const ascent = probe.actualBoundingBoxAscent || topSize * 0.75;
     const top = (topBaseline ?? H) - ascent;
@@ -283,11 +314,18 @@
   // than to some larger size with more lines: that keeps the block compact and
   // is what the Figma reference itself is (four lines at 65px).
   function chooseLayout() {
-    for (let size = HEADLINE.max; size >= HEADLINE.min; size--) {
+    const hs = headStyle();
+    // A style pinned to one size is never resized: copy that will not fit
+    // above the centre warns instead, which is the whole point of pinning it.
+    if (hs.fixed) {
+      const l = layout(hs.fixed);
+      return { ...l, overflow: l.top < TOP_LIMIT };
+    }
+    for (let size = hs.max; size >= hs.min; size--) {
       const l = layout(size);
       if (l.headLines.length <= 3 && l.top >= TOP_LIMIT) return { ...l, overflow: false };
     }
-    const floor = layout(HEADLINE.min);
+    const floor = layout(hs.min);
     return { ...floor, overflow: floor.top < TOP_LIMIT };
   }
 
@@ -339,8 +377,8 @@
 
   /* ---------- render ---------- */
 
-  function drawLines(lines, baselines, weight, size, tracking) {
-    setFont(weight, size);
+  function drawLines(lines, baselines, family, weight, size, tracking) {
+    setFont(family, weight, size);
     setTracking(tracking, size);
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
@@ -363,14 +401,15 @@
       ctx.fillRect(0, 0, W, H);
     }
 
-    drawGradient();
+    if (shown.gradient) drawGradient();
     syncColour();
 
     if (!fontsReady) return;
     const l = chooseLayout();
-    drawLines(l.eyeLines, l.eyeBaselines, 900, EYEBROW.size, EYEBROW.tracking);
-    drawLines(l.headLines, l.headBaselines, 900, l.size, HEADLINE.tracking);
-    drawLines(l.dekLines, l.dekBaselines, 500, DEK.size, DEK.tracking);
+    const hs = headStyle();
+    drawLines(l.eyeLines, l.eyeBaselines, EYEBROW.family, EYEBROW.weight, EYEBROW.size, EYEBROW.tracking);
+    drawLines(l.headLines, l.headBaselines, hs.family, hs.weight, l.size, hs.tracking);
+    drawLines(l.dekLines, l.dekBaselines, DEK.family, DEK.weight, DEK.size, DEK.tracking);
     ctx.letterSpacing = '0px';
 
     if (logoImg.complete && logoImg.naturalWidth) {
@@ -390,18 +429,22 @@
 
   function syncEditables(l) {
     syncScale();
-    placeEditable(EDIT.eyebrow, l.eyeLines, l.eyeBaselines, 900, EYEBROW.size,
-      EYEBROW.leading, EYEBROW.tracking, shown.eyebrow);
-    placeEditable(EDIT.headline, l.headLines, l.headBaselines, 900, l.size,
-      HEADLINE.leading, HEADLINE.tracking, true);
-    placeEditable(EDIT.dek, l.dekLines, l.dekBaselines, 500, DEK.size,
-      DEK.leading, DEK.tracking, shown.dek);
+    const hs = headStyle();
+    placeEditable(EDIT.eyebrow, l.eyeLines, l.eyeBaselines, EYEBROW.family, EYEBROW.weight,
+      EYEBROW.size, EYEBROW.leading, EYEBROW.tracking, shown.eyebrow);
+    placeEditable(EDIT.headline, l.headLines, l.headBaselines, hs.family, hs.weight,
+      l.size, hs.leading, hs.tracking, true);
+    placeEditable(EDIT.dek, l.dekLines, l.dekBaselines, DEK.family, DEK.weight,
+      DEK.size, DEK.leading, DEK.tracking, shown.dek);
   }
 
   function reportSize(l) {
     if (l.overflow) {
       sizeNote.className = 'size-note is-warning';
-      sizeNote.textContent = `Copy is too long — it will not fit above the centre line even at ${HEADLINE.min}px. Shorten the headline or dek.`;
+      const hs = headStyle();
+      sizeNote.textContent = hs.fixed
+        ? `Copy is too long — it will not fit above the centre line at ${hs.label}'s ${hs.fixed}px, which is a fixed size. Shorten the headline or dek, or switch font.`
+        : `Copy is too long — it will not fit above the centre line even at ${hs.min}px. Shorten the headline or dek.`;
     } else {
       /* Nothing to say when the copy fits: the note collapses to zero height
          (.size-note:empty) so it never costs a line of the page. */
@@ -532,11 +575,13 @@
 
   function syncDropperEnabled() {
     const has = !!(photo && photo.img);
-    dropperBtn.disabled = !has;
-    dropperBtn.title = has
-      ? 'Pick a colour from the image'
-      : 'Upload an image to pick a colour from it';
-    if (!has && picking) setPicking(false);
+    const usable = has && shown.gradient;
+    dropperBtn.disabled = !usable;
+    dropperBtn.title = !shown.gradient
+      ? 'Turn the gradient on to pick a colour for it'
+      : has ? 'Pick a colour from the image'
+            : 'Upload an image to pick a colour from it';
+    if (!usable && picking) setPicking(false);
   }
 
   dropperBtn.addEventListener('click', () => setPicking(!picking));
@@ -619,6 +664,30 @@
   }
 
   /* ---------- controls ---------- */
+
+  fontSelect.addEventListener('change', () => {
+    headKey = fontSelect.value in HEAD_STYLES ? fontSelect.value : 'sans';
+    render();
+  });
+
+  gradToggle.addEventListener('change', () => {
+    shown.gradient = gradToggle.checked;
+    syncGradientEnabled();
+    render();
+  });
+
+  // The gradient's three controls mean nothing while it is off, and the picked
+  // colour is kept so switching back restores exactly what was there.
+  function syncGradientEnabled() {
+    const on = shown.gradient;
+    strengthRange.disabled = !on;
+    heightRange.disabled = !on;
+    colourReset.disabled = !on;
+    stage.classList.toggle('no-gradient', !on);
+    document.querySelector('.grad-group').classList.toggle('is-off', !on);
+    if (!on && picking) setPicking(false);
+    syncDropperEnabled();
+  }
 
   strengthRange.addEventListener('input', (e) => { grad.strength = parseFloat(e.target.value); render(); });
   heightRange.addEventListener('input', (e) => { grad.height = parseFloat(e.target.value); render(); });
@@ -724,9 +793,11 @@
     layout: chooseLayout, grad, gradientColour, sampleAt,
     picked: () => (pickedColour ? pickedColour.slice() : null),
     picking: () => picking,
+    headStyle: () => ({ ...headStyle(), key: headKey }),
+    shown,
   };
 
-  syncDropperEnabled();
+  syncGradientEnabled();
   syncColour();
 
   if (window.ResizeObserver) new ResizeObserver(syncScale).observe(canvas);

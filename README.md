@@ -119,7 +119,25 @@ edit the copy, export a 1200×1500 JPG.
   logo 247×34 at y1417.
 - Type: eyebrow Source Sans 3 Black 38px/95%/+4% uppercase; headline Black
   100%/+1%; dek Medium 50px/110%/−2%. All white, centred, bottom-anchored.
-- **Headline auto-sizes between 90px and 65px.** It takes the largest size whose
+- **Two headline fonts.** A Font control switches the headline between
+  **Source Sans 3 Black**, which auto-sizes as below, and **Libre Bodoni Bold
+  at a fixed 100px** (114% leading, −1% tracking) from its own Figma panel.
+  Eyebrow and dek stay in Source Sans 3 at 38px and 50px either way, so the
+  serif option reads as a display headline against a sans deck.
+
+  The bottom-anchored gaps are baseline-to-baseline and so are **per style**,
+  not shared: the reference's 77 and 72.5 were measured against a 65px Source
+  Sans headline whose caps rise 43px, and Libre Bodoni's rise 76px at 100px —
+  reusing them ran the headline straight into the eyebrow. The serif's 110 and
+  91.5 were set to reproduce the reference's *visual* clearances exactly: 34px
+  from the eyebrow's baseline to the headline's cap top, 22.5px from the
+  headline's descender to the dek's cap top, against measured Bodoni metrics.
+
+  Libre Bodoni is self-hosted for canvas use as `'Libre Bodoni Canvas'`, for
+  the same reason as Source Sans 3 — the UI's Google-hosted Libre Bodoni is a
+  separate family and is unaffected.
+- **Headline auto-sizes between 90px and 65px** (Source Sans 3 only; the Libre
+  Bodoni option is pinned at 100px and warns rather than resizing). It takes the largest size whose
   block is at most three lines *and* stays below the card's vertical centre.
   Shrinking fits more characters per line, so longer copy needs a smaller size to
   reach three lines — that is what makes the size fall as copy grows. Copy that
@@ -145,6 +163,12 @@ edit the copy, export a 1200×1500 JPG.
   (drives both how far the colour is pulled toward the neutral and how opaque it
   gets) and **Height** (how far up the card it reaches). The easing exponent is
   fixed at the 1.15 the reference measures.
+- **The gradient is optional.** The Gradient checkbox is the Colour group's own
+  label, which is what keeps the control bar to one row — a sixth group, or a
+  third item in Show, would wrap it and cost the page its one-screen fit. Off,
+  the card is the flat photo and the dropper, swatch, Strength and Height are
+  disabled; the picked colour is remembered, so turning it back on restores
+  exactly what was there.
 - **Colour is a dropper.** Arm it and click anywhere on the card to take the
   gradient colour from that point; a loupe magnifies the pixels under the cursor
   while you aim, and the chip shows the source hex beside a dot of the colour that

@@ -10,6 +10,16 @@
   font-display: block;
 }
 
+/* Canvas-only face for the Social Card's serif headline option. The UI's
+   Google-hosted Libre Bodoni is a separate family and is unaffected. */
+@font-face {
+  font-family: 'Libre Bodoni Canvas';
+  src: url('fonts/LibreBodoni-Variable-latin.woff2') format('woff2-variations');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: block;
+}
+
 @font-face {
   font-family: 'Mada Black';
   src: url('fonts/Mada-Black.ttf') format('truetype');

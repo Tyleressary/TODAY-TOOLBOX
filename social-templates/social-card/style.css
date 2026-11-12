@@ -53,7 +53,7 @@
 }
 
 .layout-panel input[type="range"] {
-  width: 150px;
+  width: 132px;
   accent-color: var(--accent);
 }
 
@@ -360,3 +360,33 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* ===================================================================
+   Font switch and the gradient's on/off
+   =================================================================== */
+
+/* The gradient group's label is the switch, so the checkbox sits where a
+   sixth control group would otherwise push the bar onto a second row. */
+.check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.check-label input { accent-color: var(--accent); cursor: pointer; }
+
+/* Off: the colour, strength and height controls mean nothing, so they say so.
+   The picked colour is kept, and switching back restores it. */
+.grad-group.is-off .colour-row { opacity: 0.45; }
+
+.layout-panel input[type="range"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.colour-reset:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* The six groups have to total under the bar's ~986px inner width, or the
+   bar wraps to a second row and the page stops fitting one screen. */
+#fontSelect { width: 144px; }
