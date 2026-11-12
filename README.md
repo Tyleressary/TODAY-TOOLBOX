@@ -152,6 +152,14 @@ edit the copy, export a 1200×1500 JPG.
   Google-hosted Source Sans 3 is a separate family and is unaffected.
 - The white lockup at `assets/logo-white.png` is `logo.png` with every opaque
   pixel painted white; the arc's ring gaps are already transparent, so they survive.
+- **The page is laid out for one screen.** Image, Colour, Strength, Height and the
+  Show toggles share a single control bar above the card, File name and Download
+  sit on one row directly beneath it, and the vertical rhythm is tightened against
+  the shared sheet — page-locally, in `social-templates/social-card/style.css`, so
+  no other tool's spacing moves. The page measures 1171px tall at 1440px wide,
+  down from 1804px. The only line under the card is the edit hint; the size
+  readout is gone and the note below the card now appears solely to carry the
+  too-long-copy warning.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
 

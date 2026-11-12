@@ -1,19 +1,51 @@
 /* Page-local styles. Shared tool-page shell lives in ../../assets/toolbox.css */
 
-.upload-row {
-  display: grid;
-  grid-template-columns: minmax(0, 320px);
-  gap: 14px;
-  justify-content: center;
+/* ===================================================================
+   Compact layout. Everything below is a page-local override of
+   ../../assets/toolbox.css, which loads first -- the shared sheet is
+   deliberately left alone so the other tools keep their spacing.
+   =================================================================== */
+
+/* The image upload lives inside the single control bar rather than in a
+   row of its own, so it sheds the card chrome and matches .control-group. */
+.upload-group .upload-slot {
+  background: transparent;
+  border: none;
+  padding: 0;
+  align-items: center;
+  gap: var(--space-1);
 }
 
-/* Reports the size the headline settled on, or warns when copy will not fit. */
+.upload-group .upload-slot label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+/* With the border gone, the loaded state reads on the label instead. */
+.upload-group .upload-slot.has-image label { color: var(--accent); }
+
+.upload-group .upload-slot.drag-over {
+  background: transparent;
+  outline: 2px dashed var(--accent);
+  outline-offset: 6px;
+}
+
+.upload-group .file-input,
+.upload-group .zoom-row { width: 176px; }
+
+/* Only ever carries the too-long-copy warning now, so it collapses to
+   zero height while the copy fits. */
 .size-note {
   margin: 0;
   font-size: var(--text-sm);
   color: var(--text-dim);
   text-align: center;
 }
+
+.size-note:empty { display: none; }
 
 .size-note.is-warning {
   color: var(--accent-dark);
@@ -104,7 +136,7 @@
 .edit-hint {
   margin: 0;
   text-align: center;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--text-dim);
 }
 
@@ -122,3 +154,60 @@
 }
 
 .toggle-row input { accent-color: var(--accent); }
+
+/* ===================================================================
+   Vertical rhythm -- the page is built to put the control bar, the
+   whole card and the download button within one screen.
+   =================================================================== */
+
+.brand-band {
+  margin: var(--space-2) auto var(--space-3);
+  padding: clamp(10px, 1.8vw, 16px) var(--space-4);
+}
+
+.tool-main {
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+}
+
+.layout-panel {
+  gap: var(--space-3);
+  padding: 10px var(--space-3);
+  align-items: flex-start;
+}
+
+/* The frame hugs the card instead of running the full column width. */
+.tool-main > .canvas-wrap {
+  padding: var(--space-2);
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.home-link { margin-bottom: var(--space-3); }
+
+.site-footer { padding: 14px var(--gutter) var(--space-3); }
+
+/* File name and Download sit on one row directly under the card. */
+.export-panel {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  max-width: 560px;
+}
+
+.export-panel input[type="text"] {
+  flex: 1 1 150px;
+  min-width: 0;
+  padding: 9px 12px;
+  font-size: var(--text-sm);
+}
+
+.export-panel button {
+  margin-top: 0;
+  padding: 10px 20px;
+  font-size: var(--text-base);
+  white-space: nowrap;
+}

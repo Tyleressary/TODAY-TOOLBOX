@@ -396,8 +396,10 @@
       sizeNote.className = 'size-note is-warning';
       sizeNote.textContent = `Copy is too long — it will not fit above the centre line even at ${HEADLINE.min}px. Shorten the headline or dek.`;
     } else {
+      /* Nothing to say when the copy fits: the note collapses to zero height
+         (.size-note:empty) so it never costs a line of the page. */
       sizeNote.className = 'size-note';
-      sizeNote.textContent = `Headline ${l.size}px · ${l.headLines.length} line${l.headLines.length === 1 ? '' : 's'}`;
+      sizeNote.textContent = '';
     }
   }
 
