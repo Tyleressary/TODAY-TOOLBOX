@@ -141,10 +141,33 @@ edit the copy, export a 1200×1500 JPG.
   white text readable on any photo. That rule was back-solved from the reference,
   whose bottom is exactly its own `--blue-200` mixed ~0.69 toward gray-600.
   Snapping to a palette *step* was rejected: the blue, amber and red ramps top out
-  far too light for white text. Three controls only — **Colour** (auto or a ramp),
-  **Strength** (drives both how far the colour is pulled toward the neutral and how
-  opaque it gets) and **Height** (how far up the card it reaches). The easing
-  exponent is fixed at the 1.15 the reference measures.
+  far too light for white text. Three controls only — **Colour**, **Strength**
+  (drives both how far the colour is pulled toward the neutral and how opaque it
+  gets) and **Height** (how far up the card it reaches). The easing exponent is
+  fixed at the 1.15 the reference measures.
+- **Colour is a dropper.** Arm it and click anywhere on the card to take the
+  gradient colour from that point; a loupe magnifies the pixels under the cursor
+  while you aim, and the chip shows the source hex beside a dot of the colour that
+  actually lands on the card. Reset returns to the automatic colour, which is the
+  default. A picked colour goes through the same Strength-driven pull toward the
+  neutral as the automatic one, so readability holds by default and Strength keeps
+  one meaning — at Strength 0 you get the pure pick. Three things this has to get
+  right, and each has a test:
+  - It samples an offscreen layer holding **only the photo**, drawn through the
+    same transform the card uses. The visible canvas is photo + gradient + text
+    composited, so sampling that in the lower half would read a colour the
+    gradient had already tinted and every further pick would drift greyer.
+  - Arming sets `pointer-events: none` on **both** `.edit-layer` and `.edit-text`.
+    Setting it on the parent alone does nothing, because a child that re-enables
+    it stays hit-testable — and the editable text covers most of the lower half of
+    the card, which is exactly where people pick.
+  - Pan-drag shares the pointer, so it stands down while armed. One pointer path
+    covers both inputs: a desktop click is a down and up in one place and reads as
+    click-to-pick, while on touch you drag to aim and lift to commit.
+
+  Esc or a second click on the button cancels. There is no keyboard picking —
+  a point on a photograph is not a keyboard target — so the button and reset are
+  focusable and the automatic colour remains the keyboard-reachable default.
 - Canvas type uses `'Source Sans 3 Canvas'`, self-hosted at
   `assets/fonts/SourceSans3-Variable-latin.woff2` (one variable file covers both
   weights). Canvas text must not depend on a runtime font fetch — a fallback would

@@ -43,16 +43,6 @@
   function gradOpacity() { return Math.min(1, 0.55 + 0.65 * grad.strength); }
   const NEUTRAL = [0x36, 0x3b, 0x43]; // --gray-600
 
-  const RAMPS = {
-    auto: null,
-    red: [0xff, 0x51, 0x3c],
-    purple: [0x7f, 0x47, 0x9e],
-    blue: [0x4a, 0xca, 0xf1],
-    amber: [0xfe, 0xae, 0x30],
-    green: [0x00, 0x73, 0x3e],
-    gray: [0x4a, 0x51, 0x5c],
-  };
-
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   const uploadRow = document.getElementById('uploadRow');
@@ -62,7 +52,15 @@
     headline: document.getElementById('edHeadline'),
     dek: document.getElementById('edDek'),
   };
-  const rampSelect = document.getElementById('rampSelect');
+  const dropperBtn = document.getElementById('dropperBtn');
+  const colourDot = document.getElementById('colourDot');
+  const colourText = document.getElementById('colourText');
+  const colourChip = document.getElementById('colourChip');
+  const colourReset = document.getElementById('colourReset');
+  const loupe = document.getElementById('loupe');
+  const loupeCanvas = document.getElementById('loupeCanvas');
+  const loupeCtx = loupeCanvas.getContext('2d');
+  const loupeHex = document.getElementById('loupeHex');
   const strengthRange = document.getElementById('gradStrength');
   const heightRange = document.getElementById('gradHeight');
   const eyebrowToggle = document.getElementById('eyebrowToggle');
@@ -77,6 +75,12 @@
   let fileDragOver = false;
   let fontsReady = false;
   const grad = { ...GRAD_DEFAULTS };
+
+  // Gradient colour source: null means derive it from the image (Auto),
+  // otherwise an [r, g, b] the dropper sampled.
+  let pickedColour = null;
+  let picking = false;
+  let photoLayer = null; // offscreen copy of the photo alone, for sampling
 
   const logoImg = new Image();
   logoImg.onload = () => render();
@@ -138,11 +142,14 @@
     return { drawW, drawH, panXpx, panYpx };
   }
 
-  function drawPanelImage(panel, bbox) {
+  // target defaults to the visible canvas; the dropper passes its offscreen
+  // photo layer so the two can never drift apart.
+  function drawPanelImage(panel, bbox, target) {
+    const g = target || ctx;
     const { drawW, drawH, panXpx, panYpx } = panelImageMetrics(panel, bbox);
     const cx = bbox.minX + (bbox.maxX - bbox.minX) / 2 + panXpx;
     const cy = bbox.minY + (bbox.maxY - bbox.minY) / 2 + panYpx;
-    ctx.drawImage(panel.img, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
+    g.drawImage(panel.img, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
   }
 
   /* ---------- text measuring ---------- */
@@ -310,8 +317,7 @@
   }
 
   function gradientColour() {
-    const picked = RAMPS[rampSelect.value];
-    const base = picked || dominantColour();
+    const base = pickedColour || dominantColour();
     const t = gradNeutralise();
     return base.map((c, i) => Math.round(c + (NEUTRAL[i] - c) * t));
   }
@@ -358,6 +364,7 @@
     }
 
     drawGradient();
+    syncColour();
 
     if (!fontsReady) return;
     const l = chooseLayout();
@@ -415,6 +422,136 @@
     ctx.restore();
   }
 
+  /* ---------- dropper ---------- */
+
+  // The visible canvas is photo + gradient + text composited, so sampling it
+  // in the lower half would read a colour the gradient has already tinted and
+  // every further pick would drift greyer. Sample a layer holding the photo
+  // alone, drawn through the same transform the card uses.
+  function buildPhotoLayer() {
+    photoLayer = null;
+    if (!photo || !photo.img) return;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    try { drawPanelImage(photo, getPanelRect(), g); }
+    catch (e) { return; }
+    photoLayer = { canvas: c, ctx: g };
+  }
+
+  // Averages a 5x5 box, the way a real dropper's "sample size" does: a single
+  // raw pixel on a JPEG picks up compression noise.
+  function sampleAt(x, y) {
+    if (!photoLayer) return null;
+    const half = 2;
+    const left = clamp(Math.round(x) - half, 0, W - 1);
+    const top = clamp(Math.round(y) - half, 0, H - 1);
+    const w = Math.min(half * 2 + 1, W - left);
+    const h = Math.min(half * 2 + 1, H - top);
+    let d;
+    try { d = photoLayer.ctx.getImageData(left, top, w, h).data; }
+    catch (e) { return null; }
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+    return n ? [Math.round(r / n), Math.round(g / n), Math.round(b / n)] : null;
+  }
+
+  function hex(rgb) {
+    return '#' + rgb.map((c) => clamp(Math.round(c), 0, 255).toString(16).padStart(2, '0')).join('');
+  }
+
+  function setPicking(on) {
+    picking = on && !!(photo && photo.img);
+    if (picking) buildPhotoLayer();
+    stage.classList.toggle('is-picking', picking);
+    dropperBtn.setAttribute('aria-pressed', String(picking));
+    if (picking) {
+      // Leave no caret sitting in the text while the pointer means "pick".
+      Object.values(EDIT).forEach((el) => { if (document.activeElement === el) el.blur(); });
+    } else {
+      hideLoupe();
+      photoLayer = null;
+    }
+  }
+
+  function hideLoupe() { loupe.hidden = true; }
+
+  function showLoupe(clientX, clientY, x, y) {
+    const rgb = sampleAt(x, y);
+    if (!rgb) { hideLoupe(); return; }
+    const SRC = 15, Z = 6;                       // 15x15 source pixels at 6x
+    const size = loupeCanvas.width;              // 90 = 15 * 6
+    loupeCtx.imageSmoothingEnabled = false;
+    loupeCtx.clearRect(0, 0, size, size);
+    loupeCtx.fillStyle = '#ffffff';
+    loupeCtx.fillRect(0, 0, size, size);
+    loupeCtx.drawImage(photoLayer.canvas,
+      Math.round(x) - (SRC - 1) / 2, Math.round(y) - (SRC - 1) / 2, SRC, SRC, 0, 0, size, size);
+    // The cell actually under the crosshair.
+    const c = ((SRC - 1) / 2) * Z;
+    loupeCtx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    loupeCtx.lineWidth = 2;
+    loupeCtx.strokeRect(c - 1, c - 1, Z + 2, Z + 2);
+    loupeCtx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    loupeCtx.lineWidth = 1;
+    loupeCtx.strokeRect(c - 0.5, c - 0.5, Z + 1, Z + 1);
+
+    loupeHex.textContent = hex(rgb);
+    loupe.hidden = false;
+
+    // Position in stage-relative CSS pixels, clamped inside the stage, which
+    // is overflow:hidden.
+    const sr = stage.getBoundingClientRect();
+    const lw = loupe.offsetWidth || 100, lh = loupe.offsetHeight || 120;
+    const lx = clamp(clientX - sr.left - lw / 2, 2, Math.max(2, sr.width - lw - 2));
+    const ly = clamp(clientY - sr.top - lh - 14, 2, Math.max(2, sr.height - lh - 2));
+    loupe.style.left = `${lx}px`;
+    loupe.style.top = `${ly}px`;
+  }
+
+  function commitPick(x, y) {
+    const rgb = sampleAt(x, y);
+    if (!rgb) return;
+    pickedColour = rgb;
+    setPicking(false);
+    syncColour();
+    render();
+  }
+
+  // The dot shows the colour that actually lands on the card -- the source
+  // pulled toward the neutral by Strength -- so it tracks the Strength slider.
+  function syncColour() {
+    const resulting = gradientColour();
+    colourDot.style.background = hex(resulting);
+    colourText.textContent = pickedColour ? hex(pickedColour) : 'Auto';
+    colourChip.title = pickedColour
+      ? `Picked ${hex(pickedColour)} — renders as ${hex(resulting)} at this strength`
+      : `Derived from the image — renders as ${hex(resulting)} at this strength`;
+    colourReset.hidden = !pickedColour;
+  }
+
+  function syncDropperEnabled() {
+    const has = !!(photo && photo.img);
+    dropperBtn.disabled = !has;
+    dropperBtn.title = has
+      ? 'Pick a colour from the image'
+      : 'Upload an image to pick a colour from it';
+    if (!has && picking) setPicking(false);
+  }
+
+  dropperBtn.addEventListener('click', () => setPicking(!picking));
+
+  colourReset.addEventListener('click', () => {
+    pickedColour = null;
+    syncColour();
+    render();
+    dropperBtn.focus();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && picking) { e.preventDefault(); setPicking(false); }
+  });
+
   /* ---------- upload ---------- */
 
   function buildUploadSlot() {
@@ -470,7 +607,11 @@
     img.onload = () => {
       photo = { img, scaleMultiplier: 1, panX: 0, panY: 0 };
       URL.revokeObjectURL(url);
+      // A colour picked out of the previous image means nothing in this one.
+      pickedColour = null;
+      setPicking(false);
       buildUploadSlot();
+      syncDropperEnabled();
       render();
     };
     img.onerror = () => URL.revokeObjectURL(url);
@@ -479,7 +620,6 @@
 
   /* ---------- controls ---------- */
 
-  rampSelect.addEventListener('change', render);
   strengthRange.addEventListener('input', (e) => { grad.strength = parseFloat(e.target.value); render(); });
   heightRange.addEventListener('input', (e) => { grad.height = parseFloat(e.target.value); render(); });
 
@@ -515,25 +655,49 @@
   }
 
   canvas.addEventListener('pointerdown', (e) => {
+    if (picking) {
+      // One path for mouse and touch: a desktop click is a down and up in the
+      // same place, so it reads as click-to-pick; on touch you drag to aim and
+      // lift to commit, which is the only way to aim without a hover state.
+      e.preventDefault();
+      const { x, y } = clientToCanvas(e.clientX, e.clientY);
+      showLoupe(e.clientX, e.clientY, x, y);
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
     if (!photo || !photo.img) return;
     const { x, y } = clientToCanvas(e.clientX, e.clientY);
     dragState = { startX: x, startY: y, startPanX: photo.panX, startPanY: photo.panY };
     canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener('pointermove', (e) => {
+    if (picking) {
+      const { x, y } = clientToCanvas(e.clientX, e.clientY);
+      showLoupe(e.clientX, e.clientY, x, y);
+      return;
+    }
     if (!dragState || !photo) return;
     const { x, y } = clientToCanvas(e.clientX, e.clientY);
     photo.panX = (dragState.startPanX * W + (x - dragState.startX)) / W;
     photo.panY = (dragState.startPanY * H + (y - dragState.startY)) / H;
     render();
   });
+  canvas.addEventListener('pointerleave', () => { if (picking) hideLoupe(); });
   function endDrag(e) {
     if (dragState && e.pointerId !== undefined) {
       try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
     }
     dragState = null;
   }
-  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointerup', (e) => {
+    if (picking) {
+      try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
+      const { x, y } = clientToCanvas(e.clientX, e.clientY);
+      commitPick(x, y);
+      return;
+    }
+    endDrag(e);
+  });
   canvas.addEventListener('pointercancel', endDrag);
 
   canvas.addEventListener('dragover', (e) => {
@@ -556,7 +720,14 @@
     document.body.appendChild(a); a.click(); a.remove();
   });
 
-  window.__card = { layout: chooseLayout, grad, gradientColour };
+  window.__card = {
+    layout: chooseLayout, grad, gradientColour, sampleAt,
+    picked: () => (pickedColour ? pickedColour.slice() : null),
+    picking: () => picking,
+  };
+
+  syncDropperEnabled();
+  syncColour();
 
   if (window.ResizeObserver) new ResizeObserver(syncScale).observe(canvas);
   window.addEventListener('resize', syncScale);
