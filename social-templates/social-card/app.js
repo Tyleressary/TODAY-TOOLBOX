@@ -15,9 +15,22 @@
   // headline line's ink spanned 138-1063, i.e. a centred 1000px box).
   const BOX_W = 1000;
   const CENTRE_X = W / 2;
+  // The content safe inset the text box already sits in: (1200 - 1000) / 2.
+  // Reused as the left edge for left alignment and as the top safe margin,
+  // so no new margin is invented.
+  const BOX_LEFT = (W - BOX_W) / 2;
+  const SAFE_TOP = BOX_LEFT;
 
-  // The headline may never cross the card's vertical centre.
+  // In the original bottom-anchored composition the headline may never cross
+  // the card's vertical centre. Top and centre placements deliberately work
+  // above it, so there the limit is the top safe margin instead.
   const TOP_LIMIT = H / 2;
+
+  // Text composition. 'original' reproduces the existing design exactly:
+  // horizontally centred, vertically bottom-anchored to the logo.
+  const align = { h: 'original', v: 'original' };
+  function alignLeft() { return align.h === 'left'; }
+  function placeLimit() { return align.v === 'original' ? TOP_LIMIT : SAFE_TOP; }
 
   // Three independent typographic controls per style:
   //   tracking  -- extra space between letters, in em
@@ -96,6 +109,8 @@
     dek: document.getElementById('edDek'),
   };
   const fontSelect = document.getElementById('fontSelect');
+  const alignXGroup = document.getElementById('alignX');
+  const alignYGroup = document.getElementById('alignY');
   const gradToggle = document.getElementById('gradToggle');
   const dropperBtn = document.getElementById('dropperBtn');
   const colourDot = document.getElementById('colourDot');
@@ -160,7 +175,8 @@
     // CSS puts half the leading above the ascent; undo that to hit the baseline.
     const top = firstBaseline - m.fontAscent - (lineH - (m.fontAscent + m.fontDescent)) / 2;
     Object.assign(el.style, {
-      left: `${(W - BOX_W) / 2}px`,
+      textAlign: alignLeft() ? 'left' : 'center',
+      left: `${BOX_LEFT}px`,
       width: `${BOX_W}px`,
       top: `${top}px`,
       height: `${lineH * count}px`,
@@ -297,26 +313,27 @@
     return w + (words.length - 1) * wordAdvance(st, size);
   }
 
-  // Draws one centred line. The fallback places each word itself, but never
-  // each character: splitting a word would break its shaping and kerning.
-  function drawLine(text, centreX, baseline, st, size) {
+  // Draws one line, anchored either on the centre axis or on the left safe
+  // edge. Alignment only chooses where the line starts -- the gaps inside it
+  // are the style's own, never stretched to fill the measure.
+  function drawLine(text, baseline, st, size, left) {
     setStyle(st, size);
     if (CAP.wordSpacing) {
-      ctx.textAlign = 'center';
-      ctx.fillText(text, centreX, baseline);
+      ctx.textAlign = left ? 'left' : 'center';
+      ctx.fillText(text, left ? BOX_LEFT : CENTRE_X, baseline);
       return;
     }
     const words = text.split(' ');
     if (words.length === 1) {
-      ctx.textAlign = 'center';
-      ctx.fillText(text, centreX, baseline);
+      ctx.textAlign = left ? 'left' : 'center';
+      ctx.fillText(text, left ? BOX_LEFT : CENTRE_X, baseline);
       return;
     }
     const gap = wordAdvance(st, size);
     const total = measureLine(text, st, size);
     setStyle(st, size);
     ctx.textAlign = 'left';
-    let x = centreX - total / 2;
+    let x = left ? BOX_LEFT : CENTRE_X - total / 2;
     for (let i = 0; i < words.length; i++) {
       ctx.fillText(words[i], x, baseline);
       x += ctx.measureText(words[i]).width + gap;
@@ -432,10 +449,44 @@
     setStyle(topIsEyebrow ? EYEBROW : hs, topSize);
     const probe = ctx.measureText(eyeBaselines.length ? (eyeLines[0] || 'H') : (headLines[0] || 'H'));
     const ascent = probe.actualBoundingBoxAscent || topSize * 0.75;
-    const top = (topBaseline ?? H) - ascent;
+    const rawTop = (topBaseline ?? H) - ascent;
+
+    // Bottom ink of the group, for its height. The last line is the dek's if
+    // there is one, otherwise the headline's.
+    const lastIsDek = dekBaselines.length > 0;
+    const lastBaseline = lastIsDek ? dekBaselines[dekBaselines.length - 1]
+                                   : headBaselines[headBaselines.length - 1];
+    const lastSt = lastIsDek ? DEK : hs;
+    const lastSize = lastIsDek ? DEK.size : size;
+    setStyle(lastSt, lastSize);
+    const lastProbe = ctx.measureText(
+      (lastIsDek ? dekLines[dekLines.length - 1] : headLines[headLines.length - 1]) || 'Hg');
+    const descent = lastProbe.actualBoundingBoxDescent || lastSize * 0.21;
+    const bottomInk = (lastBaseline ?? H) + descent;
+
+    // The whole group moves as one; every internal gap is already baked into
+    // the baselines above and is untouched by the shift. The text area runs
+    // from the top safe margin down to wherever the group's ink bottoms out
+    // in the original composition -- i.e. the logo's existing clearance --
+    // so centring can never push text into the logo.
+    //   top:    ink top lands on the safe margin
+    //   centre: half of that, since both share the same bottom edge
+    let shiftY = 0;
+    if (align.v === 'top') shiftY = SAFE_TOP - rawTop;
+    else if (align.v === 'center') shiftY = (SAFE_TOP - rawTop) / 2;
+
+    if (shiftY) {
+      for (let i = 0; i < eyeBaselines.length; i++) eyeBaselines[i] += shiftY;
+      for (let i = 0; i < headBaselines.length; i++) headBaselines[i] += shiftY;
+      for (let i = 0; i < dekBaselines.length; i++) dekBaselines[i] += shiftY;
+    }
 
     return { size, headLines, dekLines, eyeLines, headBaselines, dekBaselines, eyeBaselines,
-             logoTop, logoH, top };
+             logoTop, logoH,
+             top: rawTop + shiftY,
+             // Pre-shift, so the fit test is about the group's HEIGHT rather
+             // than where it was moved to.
+             rawTop, bottomInk: bottomInk + shiftY, groupH: bottomInk - rawTop, shiftY };
   }
 
   // Two conditions make a headline "comfortable": at most three lines, and a
@@ -451,16 +502,17 @@
     const hs = headStyle();
     // A style pinned to one size is never resized: copy that will not fit
     // above the centre warns instead, which is the whole point of pinning it.
+    const limit = placeLimit();
     if (hs.fixed) {
       const l = layout(hs.fixed);
-      return { ...l, overflow: l.top < TOP_LIMIT };
+      return { ...l, overflow: l.rawTop < limit };
     }
     for (let size = hs.max; size >= hs.min; size--) {
       const l = layout(size);
-      if (l.headLines.length <= 3 && l.top >= TOP_LIMIT) return { ...l, overflow: false };
+      if (l.headLines.length <= 3 && l.rawTop >= limit) return { ...l, overflow: false };
     }
     const floor = layout(hs.min);
-    return { ...floor, overflow: floor.top < TOP_LIMIT };
+    return { ...floor, overflow: floor.rawTop < limit };
   }
 
   /* ---------- gradient ---------- */
@@ -514,7 +566,8 @@
   function drawLines(lines, baselines, st, size) {
     ctx.fillStyle = '#ffffff';
     ctx.textBaseline = 'alphabetic';
-    lines.forEach((line, i) => drawLine(line, CENTRE_X, baselines[i], st, size));
+    const left = alignLeft();
+    lines.forEach((line, i) => drawLine(line, baselines[i], st, size, left));
   }
 
   function render() {
@@ -572,9 +625,10 @@
     if (l.overflow) {
       sizeNote.className = 'size-note is-warning';
       const hs = headStyle();
+      const where = align.v === 'original' ? 'above the centre line' : 'inside the text area';
       sizeNote.textContent = hs.fixed
-        ? `Copy is too long — it will not fit above the centre line at ${hs.label}'s ${hs.fixed}px, which is a fixed size. Shorten the headline or dek, or switch font.`
-        : `Copy is too long — it will not fit above the centre line even at ${hs.min}px. Shorten the headline or dek.`;
+        ? `Copy is too long — it will not fit ${where} at ${hs.label}'s ${hs.fixed}px, which is a fixed size. Shorten the headline or dek, or switch font.`
+        : `Copy is too long — it will not fit ${where} even at ${hs.min}px. Shorten the headline or dek.`;
     } else {
       /* Nothing to say when the copy fits: the note collapses to zero height
          (.size-note:empty) so it never costs a line of the page. */
@@ -801,6 +855,26 @@
     render();
   });
 
+  // Two independent settings, combinable; 'original' in both reproduces the
+  // existing design exactly.
+  function wireSegmented(group, axis) {
+    group.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-v]');
+      if (!btn || btn.dataset.v === align[axis]) return;
+      align[axis] = btn.dataset.v;
+      [...group.querySelectorAll('button')].forEach((b) => {
+        const on = b.dataset.v === align[axis];
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', String(on));
+      });
+      render();
+    });
+    [...group.querySelectorAll('button')].forEach((b) =>
+      b.setAttribute('aria-pressed', String(b.dataset.v === align[axis])));
+  }
+  wireSegmented(alignXGroup, 'h');
+  wireSegmented(alignYGroup, 'v');
+
   gradToggle.addEventListener('change', () => {
     shown.gradient = gradToggle.checked;
     syncGradientEnabled();
@@ -931,6 +1005,9 @@
     shown,
     styles: { EYEBROW, DEK, HEAD_STYLES },
     pristine: () => headPristine,
+    align,
+    setAlign: (h, v) => { if (h) align.h = h; if (v) align.v = v; render(); },
+    geom: { W, H, BOX_W, BOX_LEFT, SAFE_TOP, TOP_LIMIT, CENTRE_X },
     defaults: { ...DEFAULT_HEAD },
     caps: () => ({ ...CAP }),
     baseSpace, wordAdvance, wordSpacingPx, measureLine,

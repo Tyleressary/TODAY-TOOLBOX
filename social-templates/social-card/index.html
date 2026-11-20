@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Bodoni:ital,wght@0,400..700;1,400..700&family=Source+Sans+3:wght@400;600;700;900&display=swap">
 <link rel="stylesheet" href="../../assets/toolbox.css?v=12">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
   <header class="page-shell">
@@ -20,49 +20,72 @@
 
   <main class="tool-main">
     <section class="layout-panel" aria-label="Image and gradient">
-      <div class="control-group upload-group" id="uploadRow"></div>
-      <div class="control-group">
-        <label class="control-label" for="fontSelect">Font</label>
-        <select class="select-control" id="fontSelect">
-          <option value="sans" selected>Source Sans 3</option>
-          <option value="serif">Libre Bodoni</option>
-        </select>
-      </div>
-      <div class="control-group grad-group">
-        <label class="control-label check-label" id="colourLabel">
-          <input type="checkbox" id="gradToggle" checked> Gradient
-        </label>
-        <div class="colour-row">
-          <button type="button" class="dropper-btn" id="dropperBtn" aria-pressed="false"
-                  aria-describedby="colourLabel" title="Upload an image to pick a colour from it" disabled>
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M17.2 2.6a2.5 2.5 0 0 1 3.5 3.5l-2.1 2.1 1 1-1.8 1.8-1-1-6.6 6.6-3.6.9.9-3.6 6.6-6.6-1-1 1.8-1.8 1 1 2.1-2.1Z"/>
-              <path d="M4.6 16.4 3 20.9a.8.8 0 0 0 1 1l4.5-1.6"/>
-            </svg>
-            <span class="sr-only">Pick a colour from the image</span>
-          </button>
-          <span class="colour-chip" id="colourChip">
-            <span class="colour-dot" id="colourDot"></span>
-            <span id="colourText" aria-live="polite">Auto</span>
-          </span>
-          <button type="button" class="colour-reset" id="colourReset" title="Back to the automatic colour" hidden>
-            <span aria-hidden="true">&times;</span><span class="sr-only">Back to the automatic colour</span>
-          </button>
+      <!-- Two explicit rows: eight groups no longer fit one. Image and
+           gradient above, the text controls below. Explicit rather than
+           left to flex-wrap, so the split cannot flip on a 1px measurement. -->
+      <div class="panel-row">
+        <div class="control-group upload-group" id="uploadRow"></div>
+        <div class="control-group">
+          <label class="control-label" for="fontSelect">Font</label>
+          <select class="select-control" id="fontSelect">
+            <option value="sans" selected>Source Sans 3</option>
+            <option value="serif">Libre Bodoni</option>
+          </select>
+        </div>
+        <div class="control-group grad-group">
+          <label class="control-label check-label" id="colourLabel">
+            <input type="checkbox" id="gradToggle" checked> Gradient
+          </label>
+          <div class="colour-row">
+            <button type="button" class="dropper-btn" id="dropperBtn" aria-pressed="false"
+                    aria-describedby="colourLabel" title="Upload an image to pick a colour from it" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M17.2 2.6a2.5 2.5 0 0 1 3.5 3.5l-2.1 2.1 1 1-1.8 1.8-1-1-6.6 6.6-3.6.9.9-3.6 6.6-6.6-1-1 1.8-1.8 1 1 2.1-2.1Z"/>
+                <path d="M4.6 16.4 3 20.9a.8.8 0 0 0 1 1l4.5-1.6"/>
+              </svg>
+              <span class="sr-only">Pick a colour from the image</span>
+            </button>
+            <span class="colour-chip" id="colourChip">
+              <span class="colour-dot" id="colourDot"></span>
+              <span id="colourText" aria-live="polite">Auto</span>
+            </span>
+            <button type="button" class="colour-reset" id="colourReset" title="Back to the automatic colour" hidden>
+              <span aria-hidden="true">&times;</span><span class="sr-only">Back to the automatic colour</span>
+            </button>
+          </div>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="gradStrength">Strength</label>
+          <input id="gradStrength" type="range" min="0" max="1" step="0.01" value="0.70">
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="gradHeight">Height</label>
+          <input id="gradHeight" type="range" min="0.2" max="0.85" step="0.005" value="0.525">
         </div>
       </div>
-      <div class="control-group">
-        <label class="control-label" for="gradStrength">Strength</label>
-        <input id="gradStrength" type="range" min="0" max="1" step="0.01" value="0.70">
-      </div>
-      <div class="control-group">
-        <label class="control-label" for="gradHeight">Height</label>
-        <input id="gradHeight" type="range" min="0.2" max="0.85" step="0.005" value="0.525">
-      </div>
-      <div class="control-group">
-        <span class="control-label">Show</span>
-        <div class="toggle-row">
-          <label><input type="checkbox" id="eyebrowToggle" checked> Eyebrow</label>
-          <label><input type="checkbox" id="dekToggle" checked> Dek</label>
+      <div class="panel-row">
+        <div class="control-group">
+          <span class="control-label" id="alignLabel">Align</span>
+          <div class="segmented" id="alignX" role="group" aria-labelledby="alignLabel">
+            <button type="button" data-v="original" class="active">Orig</button>
+            <button type="button" data-v="left">Left</button>
+            <button type="button" data-v="center">Centre</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <span class="control-label" id="placeLabel">Place</span>
+          <div class="segmented" id="alignY" role="group" aria-labelledby="placeLabel">
+            <button type="button" data-v="original" class="active">Orig</button>
+            <button type="button" data-v="top">Top</button>
+            <button type="button" data-v="center">Centre</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <span class="control-label">Show</span>
+          <div class="toggle-row">
+            <label><input type="checkbox" id="eyebrowToggle" checked> Eyebrow</label>
+            <label><input type="checkbox" id="dekToggle" checked> Dek</label>
+          </div>
         </div>
       </div>
     </section>
@@ -106,6 +129,6 @@
     <p>TODAY Toolbox &mdash; internal team tools</p>
   </footer>
 
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

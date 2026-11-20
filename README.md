@@ -200,6 +200,36 @@ edit the copy, export a 1200×1500 JPG.
   (drives both how far the colour is pulled toward the neutral and how opaque it
   gets) and **Height** (how far up the card it reaches). The easing exponent is
   fixed at the 1.15 the reference measures.
+- **Text layout: two independent settings.** **Align** (Original / Left /
+  Centre) and **Place** (Original / Top / Centre), freely combinable.
+  Original/Original reproduces the existing design exactly — the default-state
+  export is byte-identical to before the feature existed.
+
+  Both reference the inset the text box already sits in, `(1200 − 1000) / 2 =
+  100px`, as the left edge and as the top safe margin; no new margin is
+  invented. *Align: Centre is identical to Original by construction*, since the
+  card is already centred — the meaningful distinction is Left. Alignment only
+  chooses where a line starts: the gaps inside it are the style's own, never
+  stretched, and there is no justification.
+
+  The three blocks are **one composition**. Placement shifts every baseline by
+  a single offset, so every internal gap survives untouched — verified
+  identical across all nine combinations. The text area runs from the top safe
+  margin down to wherever the group's ink bottoms out in the original
+  composition, i.e. the logo's existing clearance, so Centre is exactly half
+  the Top offset and neither can push text into the logo. The logo is drawn
+  from its own unshifted `logoTop` and never moves.
+
+  Auto-sizing keeps the ≤3-line rule, but its vertical limit follows the
+  placement: the original bottom-anchored composition still may not cross the
+  card's centre, while Top and Centre work above it and are instead bounded by
+  the group having to fit the text area. The fit test is on the group's height
+  (pre-shift), so it asks "does this fit?" rather than "where was it moved to?".
+  Copy that will not fit still warns rather than clipping.
+
+  One consequence worth knowing: Top placement lifts the text clear of the
+  gradient, so on a bright image white text can lose contrast there. The
+  gradient Height control is the lever for that.
 - **The gradient is optional.** The Gradient checkbox is the Colour group's own
   label, which is what keeps the control bar to one row — a sixth group, or a
   third item in Show, would wrap it and cost the page its one-screen fit. Off,

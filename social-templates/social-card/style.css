@@ -390,3 +390,25 @@
 /* The six groups have to total under the bar's ~986px inner width, or the
    bar wraps to a second row and the page stops fitting one screen. */
 #fontSelect { width: 144px; }
+
+/* Text-layout segmented controls, sized to sit in the same bar. */
+.layout-panel .segmented button {
+  padding: 7px 11px;
+  font-size: var(--text-sm);
+}
+
+/* The control bar is two explicit rows, so the split is deterministic and the
+   gap between them is one value rather than flex-wrap's row-gap. */
+.layout-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.panel-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
