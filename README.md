@@ -200,6 +200,46 @@ edit the copy, export a 1200×1500 JPG.
   (drives both how far the colour is pulled toward the neutral and how opaque it
   gets) and **Height** (how far up the card it reaches). The easing exponent is
   fixed at the 1.15 the reference measures.
+- **Automatic editorial line breaking.** Greedy wrapping — take as many words
+  as fit — is what strands widows, and on a 48-headline corpus run through the
+  real pipeline **12 produced one**: `System` at 303px under a 958px line,
+  `Plan` at 214px under 893px. A gated pass fixes those and leaves everything
+  else alone.
+
+  It is **gated on a genuine fault**: a one-word last line under 45% of the
+  longest, or any last line under 30%. A line ending on a function word is a
+  blemish, ranked on below — never a trigger. Candidates are every arrangement
+  with the **same line count** whose lines fit the measure; those still at
+  fault are dropped, then any whose shortest line falls under 45% of its
+  longest, so a widow is never traded for dramatic unevenness. What survives is
+  ranked by phrase grouping first — lines ending on an article, short
+  preposition, conjunction or bare numeral — then by raggedness. Nothing
+  qualifies, or the enumeration hits its cap: greedy is kept untouched.
+
+  Two obvious designs were built, measured and rejected. Minimising line-length
+  variance everywhere turned a clean descending rag (984/861/638) into a zigzag
+  (720/954/810) — evenness is not the goal. Treating a function-word line
+  ending as a *fault* rewrote the reference dek and destroyed that same rag to
+  avoid ending on "the".
+
+  Because the line count is fixed to greedy's and the pass runs after the size
+  sweep, it **cannot** move the font, size, tracking, word spacing, kerning,
+  leading, the gaps between blocks, the ≤3-line rule or any baseline. Only
+  where words break. The Typeset toggle turns it off and restores plain greedy
+  exactly.
+
+  There is no grammar model: "phrase grouping" is the function-word and numeral
+  rule above. It is a real editorial convention and catches the common cases,
+  but it cannot recognise an arbitrary noun phrase.
+
+  The overlay is given the canvas's breaks as newlines (`.edit-text` is
+  `pre-wrap`), because the two previously agreed only by both being greedy.
+  That rewrite is allowed **only** as a whitespace-for-whitespace swap at
+  identical positions — never a change in length. Anything else is refused,
+  since mid-word the user's text legitimately differs from the trimmed,
+  wrapped version: typing a space gives `My ` against a wanted `My`, and
+  rewriting there ate the character just typed. Equal length also means the
+  caret offset survives untouched.
 - **Text layout: two independent settings.** **Align** (Original / Left /
   Centre) and **Place** (Original / Top / Centre), freely combinable.
   Original/Original reproduces the existing design exactly — the default-state

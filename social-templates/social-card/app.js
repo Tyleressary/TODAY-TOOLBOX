@@ -29,6 +29,8 @@
   // Text composition. 'original' reproduces the existing design exactly:
   // horizontally centred, vertically bottom-anchored to the logo.
   const align = { h: 'original', v: 'original' };
+  // Automatic editorial line breaking; off reverts to plain greedy wrapping.
+  let typeset = true;
   function alignLeft() { return align.h === 'left'; }
   function placeLimit() { return align.v === 'original' ? TOP_LIMIT : SAFE_TOP; }
 
@@ -111,6 +113,7 @@
   const fontSelect = document.getElementById('fontSelect');
   const alignXGroup = document.getElementById('alignX');
   const alignYGroup = document.getElementById('alignY');
+  const typesetToggle = document.getElementById('typesetToggle');
   const gradToggle = document.getElementById('gradToggle');
   const dropperBtn = document.getElementById('dropperBtn');
   const colourDot = document.getElementById('colourDot');
@@ -164,9 +167,61 @@
   // caret and selection land where the glyphs are. The text itself is
   // transparent -- the canvas underneath is what you actually see, which keeps
   // the preview and the exported JPG the same renderer.
+  // Caret position as a character offset into the block's text, so it can be
+  // restored across a rewrite.
+  function caretOffset(el) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !el.contains(sel.anchorNode)) return null;
+    const r = sel.getRangeAt(0).cloneRange();
+    r.selectNodeContents(el);
+    r.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+    return r.toString().length;
+  }
+
+  function setCaretOffset(el, offset) {
+    const node = el.firstChild;
+    if (!node || node.nodeType !== Node.TEXT_NODE) return;
+    const pos = Math.max(0, Math.min(offset, node.textContent.length));
+    const r = document.createRange();
+    r.setStart(node, pos); r.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+
+  // The canvas and the overlay used to agree because both wrapped greedily.
+  // Once the engine chooses the canvas's breaks, CSS no longer matches it, so
+  // the overlay is given those breaks as newlines (.edit-text is pre-wrap).
+  // Swapping a space for a newline keeps the text the same length, so the
+  // caret offset is unaffected -- and readEditable collapses whitespace, so
+  // the user's text is unchanged.
+  function syncEditableBreaks(el, lines) {
+    if (!lines.length) return;
+    const wanted = lines.join('\n');
+    const cur = el.textContent;
+    if (cur === wanted) return;
+    // Swap whitespace for whitespace at the same positions, and nothing else.
+    // Anything that would add or remove a character is refused: mid-word the
+    // user's text legitimately differs from the trimmed, wrapped version --
+    // typing a space gives "My " against a wanted "My" -- and rewriting there
+    // would eat the character they just typed. Equal length also means the
+    // caret offset survives untouched.
+    if (cur.length !== wanted.length) return;
+    for (let i = 0; i < cur.length; i++) {
+      if (cur[i] === wanted[i]) continue;
+      const a = cur[i], b = wanted[i];
+      if ((a === ' ' || a === '\n') && (b === ' ' || b === '\n')) continue;
+      return;
+    }
+    const focused = document.activeElement === el;
+    const off = focused ? caretOffset(el) : null;
+    el.textContent = wanted;
+    if (focused && off !== null) setCaretOffset(el, off);
+  }
+
   function placeEditable(el, lines, baselines, st, size, visible) {
     if (!visible) { el.hidden = true; return; }
     el.hidden = false;
+    syncEditableBreaks(el, lines);
     const leading = st.leading, tracking = st.tracking, family = st.family, weight = st.weight;
     const m = metrics(st, size);
     const lineH = size * leading;
@@ -382,6 +437,121 @@
     return lines;
   }
 
+  /* ---------- editorial line breaking ---------- */
+
+  // Greedy wrapping -- take as many words as fit -- is what strands widows.
+  // This pass is GATED: it does nothing unless the greedy result has a real
+  // fault, because an over-eager engine is worse than none. Wholesale
+  // rebalancing was measured and rejected: minimising line-length variance
+  // turned a clean descending rag (984/861/638) into a zigzag (720/954/810).
+  const TYPESET = {
+    // A one-word last line this far under the longest line is a widow.
+    widowFrac: 0.45,
+    // Any last line this far under the longest is an orphan sliver.
+    shortFrac: 0.30,
+    // "Dramatically uneven": no line may fall below this share of the longest.
+    evenFloor: 0.45,
+    // Enumeration ceiling; hitting it falls back to greedy untouched.
+    maxCandidates: 4000,
+  };
+
+  // Words that govern what follows, so a line should not end on one. This is
+  // a real editorial convention, not a grammar model: it catches articles,
+  // short prepositions, conjunctions and bare numerals, and cannot recognise
+  // an arbitrary noun phrase.
+  const PHRASE_WORDS = new Set([
+    'a', 'an', 'the', 'of', 'to', 'in', 'at', 'on', 'for', 'and', 'or', 'but',
+    'as', 'by', 'is', 'it', 'with', 'from', 'that', 'into', 'over', 'per',
+  ]);
+  function endsPhrase(word) {
+    const w = String(word).toLowerCase().replace(/[^a-z0-9’']/g, '');
+    return PHRASE_WORDS.has(w) || /^\d+$/.test(w);
+  }
+
+  // The fault that justifies rewrapping. A line ending on a function word is
+  // a blemish ranked on below -- never a trigger, or good rags get destroyed.
+  function lineFault(lines, widths) {
+    if (lines.length < 2) return null;
+    const longest = Math.max(...widths);
+    const last = widths[widths.length - 1];
+    if (!longest) return null;
+    const oneWord = lines[lines.length - 1].trim().split(/\s+/).length === 1;
+    if (oneWord && last < longest * TYPESET.widowFrac) return 'widow';
+    if (last < longest * TYPESET.shortFrac) return 'short-last';
+    return null;
+  }
+
+  // Summed squared shortfall from the longest line: penalises a short line
+  // anywhere, not only at the end.
+  function raggedness(widths) {
+    const longest = Math.max(...widths);
+    return widths.reduce((s, w) => s + ((longest - w) / BOX_W) ** 2, 0);
+  }
+
+  // Every arrangement with the SAME line count whose lines all fit, pruned on
+  // width. The line count is fixed, which is what makes the chosen font size,
+  // the baselines and every gap impossible to disturb.
+  function breakCandidates(words, count, st, size) {
+    const n = words.length;
+    const out = [];
+    const cache = new Map();
+    const width = (i, j) => {
+      const key = i + ':' + j;
+      let v = cache.get(key);
+      if (v === undefined) { v = measureLine(words.slice(i, j).join(' '), st, size); cache.set(key, v); }
+      return v;
+    };
+    let capped = false;
+    const walk = (i, left, acc) => {
+      if (capped) return;
+      if (out.length >= TYPESET.maxCandidates) { capped = true; return; }
+      if (left === 1) {
+        const w = width(i, n);
+        if (w <= BOX_W) out.push([...acc, [i, n]]);
+        return;
+      }
+      for (let j = i + 1; j <= n - (left - 1); j++) {
+        if (width(i, j) > BOX_W) break;   // longer prefixes only get wider
+        walk(j, left - 1, [...acc, [i, j]]);
+      }
+    };
+    walk(0, count, []);
+    if (capped) return null;
+    return out.map((segs) => ({
+      lines: segs.map(([a, b]) => words.slice(a, b).join(' ')),
+      widths: segs.map(([a, b]) => width(a, b)),
+    }));
+  }
+
+  function polishLines(lines, st, size) {
+    if (!typeset || lines.length < 2) return lines;
+    const widths = lines.map((t) => measureLine(t, st, size));
+    if (!lineFault(lines, widths)) return lines;          // already fine
+
+    const words = lines.join(' ').split(/\s+/).filter(Boolean);
+    const cands = breakCandidates(words, lines.length, st, size);
+    if (!cands) return lines;                             // hit the cap
+
+    const clean = cands.filter((c) => !lineFault(c.lines, c.widths));
+    if (!clean.length) return lines;                      // no cure; leave it
+
+    // Never trade a widow for dramatic unevenness.
+    const evenness = (c) => Math.min(...c.widths) / Math.max(...c.widths);
+    let pool = clean.filter((c) => evenness(c) >= TYPESET.evenFloor);
+    if (!pool.length) pool = clean;
+
+    // Phrase grouping first, then rag.
+    let best = null, bestKey = null;
+    for (const c of pool) {
+      const phrase = c.lines.slice(0, -1).filter((l) => endsPhrase(l.split(' ').pop())).length;
+      const key = [phrase, raggedness(c.widths)];
+      if (!bestKey || key[0] < bestKey[0] || (key[0] === bestKey[0] && key[1] < bestKey[1])) {
+        best = c; bestKey = key;
+      }
+    }
+    return best ? best.lines : lines;
+  }
+
   // Font metrics for the overlay's half-leading maths.
   function metrics(st, size) {
     setStyle(st, size);
@@ -397,15 +567,19 @@
   /* ---------- layout ---------- */
 
   // Builds the bottom-anchored stack and reports where its top edge lands.
-  function layout(size) {
+  function layout(size, polish) {
     const eyebrowText = shown.eyebrow ? readEditable(EDIT.eyebrow).toUpperCase() : '';
     const headlineText = readEditable(EDIT.headline);
     const dekText = shown.dek ? readEditable(EDIT.dek) : '';
 
     const hs = headStyle();
-    const headLines = wrap(headlineText, hs, size, BOX_W);
-    const dekLines = dekText ? wrap(dekText, DEK, DEK.size, BOX_W) : [];
-    const eyeLines = eyebrowText ? wrap(eyebrowText, EYEBROW, EYEBROW.size, BOX_W) : [];
+    // The sweep wraps greedily; only the winning size is polished, so the
+    // engine runs once per render rather than at all 26 candidate sizes.
+    const P = (lines, st, sz) => (polish ? polishLines(lines, st, sz) : lines);
+    const headLines = P(wrap(headlineText, hs, size, BOX_W), hs, size);
+    const dekLines = dekText ? P(wrap(dekText, DEK, DEK.size, BOX_W), DEK, DEK.size) : [];
+    const eyeLines = eyebrowText
+      ? P(wrap(eyebrowText, EYEBROW, EYEBROW.size, BOX_W), EYEBROW, EYEBROW.size) : [];
 
     const logoH = Math.round(LOGO_WIDTH * (logoImg.height || 98) / (logoImg.width || 720));
     const logoBottom = H - LOGO_BOTTOM_MARGIN;
@@ -503,15 +677,31 @@
     // A style pinned to one size is never resized: copy that will not fit
     // above the centre warns instead, which is the whole point of pinning it.
     const limit = placeLimit();
+    // Polishing keeps the line count, so it cannot move the chosen size; the
+    // winner is re-laid once with it on. If the polished block somehow stops
+    // fitting, keep the greedy one rather than ship something clipped.
+    const settle = (size, greedyLayout) => {
+      if (!typeset) return greedyLayout;
+      const p = layout(size, true);
+      if (p.headLines.length !== greedyLayout.headLines.length) return greedyLayout;
+      if (p.dekLines.length !== greedyLayout.dekLines.length) return greedyLayout;
+      if (p.eyeLines.length !== greedyLayout.eyeLines.length) return greedyLayout;
+      if (greedyLayout.rawTop >= limit && p.rawTop < limit) return greedyLayout;
+      return p;
+    };
     if (hs.fixed) {
-      const l = layout(hs.fixed);
+      const g = layout(hs.fixed);
+      const l = settle(hs.fixed, g);
       return { ...l, overflow: l.rawTop < limit };
     }
     for (let size = hs.max; size >= hs.min; size--) {
-      const l = layout(size);
-      if (l.headLines.length <= 3 && l.rawTop >= limit) return { ...l, overflow: false };
+      const g = layout(size);
+      if (g.headLines.length <= 3 && g.rawTop >= limit) {
+        return { ...settle(size, g), overflow: false };
+      }
     }
-    const floor = layout(hs.min);
+    const floorG = layout(hs.min);
+    const floor = settle(hs.min, floorG);
     return { ...floor, overflow: floor.rawTop < limit };
   }
 
@@ -872,6 +1062,8 @@
     [...group.querySelectorAll('button')].forEach((b) =>
       b.setAttribute('aria-pressed', String(b.dataset.v === align[axis])));
   }
+  typesetToggle.addEventListener('change', () => { typeset = typesetToggle.checked; render(); });
+
   wireSegmented(alignXGroup, 'h');
   wireSegmented(alignYGroup, 'v');
 
@@ -1007,6 +1199,9 @@
     pristine: () => headPristine,
     align,
     setAlign: (h, v) => { if (h) align.h = h; if (v) align.v = v; render(); },
+    setTypeset: (on) => { typeset = !!on; typesetToggle.checked = !!on; render(); },
+    typeset: () => typeset,
+    polishLines, lineFault, raggedness, endsPhrase, TYPESET,
     geom: { W, H, BOX_W, BOX_LEFT, SAFE_TOP, TOP_LIMIT, CENTRE_X },
     defaults: { ...DEFAULT_HEAD },
     caps: () => ({ ...CAP }),
