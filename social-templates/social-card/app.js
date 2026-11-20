@@ -19,8 +19,17 @@
   // The headline may never cross the card's vertical centre.
   const TOP_LIMIT = H / 2;
 
-  const EYEBROW = { family: SANS, weight: 900, size: 38, leading: 0.95, tracking: 0.04 };
-  const DEK = { family: SANS, weight: 500, size: 50, leading: 1.10, tracking: -0.02 };
+  // Three independent typographic controls per style:
+  //   tracking  -- extra space between letters, in em
+  //   wordSpace -- the TOTAL advance of a space, in em (not an increment)
+  //   kerning   -- the font's own pair adjustments, left to the font
+  // Canvas letterSpacing lands on the space glyph as well as on letters, so
+  // without wordSpace each style's word gaps were decided by its tracking:
+  // +4% opened the eyebrow's, -2% pinched the dek's, -1% pinched the serif
+  // headline's to 0.15em, where `Serif Headline` ran together. Stating the
+  // advance keeps the three controls from moving each other.
+  const EYEBROW = { family: SANS, weight: 900, size: 38, leading: 0.95, tracking: 0.04, wordSpace: 0.240 };
+  const DEK = { family: SANS, weight: 500, size: 50, leading: 1.10, tracking: -0.02, wordSpace: 0.200 };
 
   // Two headline styles. The sans one auto-sizes 90..65 under the rule in
   // chooseLayout(); the serif one is pinned at the size its Figma panel
@@ -36,10 +45,10 @@
   // Bodoni metrics (cap 76, descender 33 at 100px; dek ascent 36 at 50px).
   const HEAD_STYLES = {
     sans: { label: 'Source Sans 3', family: SANS, weight: 900,
-            min: 65, max: 90, leading: 1.00, tracking: 0.01,
+            min: 65, max: 90, leading: 1.00, tracking: 0.01, wordSpace: 0.210,
             gapEye: 77, gapDek: 72.5 },
     serif: { label: 'Libre Bodoni', family: SERIF, weight: 700,
-             fixed: 100, leading: 1.14, tracking: -0.01,
+             fixed: 100, leading: 1.14, tracking: -0.01, wordSpace: 0.210,
              gapEye: 110, gapDek: 91.5 },
   };
   let headKey = 'sans';
@@ -130,10 +139,11 @@
   // caret and selection land where the glyphs are. The text itself is
   // transparent -- the canvas underneath is what you actually see, which keeps
   // the preview and the exported JPG the same renderer.
-  function placeEditable(el, lines, baselines, family, weight, size, leading, tracking, visible) {
+  function placeEditable(el, lines, baselines, st, size, visible) {
     if (!visible) { el.hidden = true; return; }
     el.hidden = false;
-    const m = metrics(family, weight, size);
+    const leading = st.leading, tracking = st.tracking, family = st.family, weight = st.weight;
+    const m = metrics(st, size);
     const lineH = size * leading;
     const count = Math.max(1, lines.length);
     const firstBaseline = baselines.length ? baselines[0] : H - 200;
@@ -148,7 +158,12 @@
       fontWeight: String(weight),
       fontSize: `${size}px`,
       lineHeight: `${lineH}px`,
-      letterSpacing: `${(tracking * size).toFixed(2)}px`,
+      letterSpacing: `${(tracking * size).toFixed(3)}px`,
+      // The same px value the canvas uses: CSS word-spacing and letter-spacing
+      // treat the space glyph exactly as Canvas does, so the caret and the
+      // selection keep landing on the glyphs.
+      wordSpacing: `${wordSpacingPx(st, size).toFixed(3)}px`,
+      fontKerning: 'normal',
     });
   }
 
@@ -186,14 +201,123 @@
     ctx.font = `${weight} ${size}px ${family}`;
   }
 
-  // Canvas letterSpacing is honoured by Chrome/Edge; where it is not, the
-  // measurement below still matches what is drawn, so wrapping stays correct.
-  function setTracking(em, size) {
-    ctx.letterSpacing = `${(em * size).toFixed(2)}px`;
+  /* ---------- spacing: three controls that do not move each other ---------- */
+
+  // What the browser actually does, not what it claims to expose: a property
+  // can exist and still not reach measureText or the raster. Probed once, in a
+  // scratch context, so the real one is never left in a probe state.
+  const CAP = (() => {
+    const g = document.createElement('canvas').getContext('2d');
+    g.font = '700 100px serif';
+    const plain = g.measureText('a b').width;
+    let wordSpacing = false, letterSpacing = false, fontKerning = false;
+    try { g.wordSpacing = '20px'; wordSpacing = Math.abs(g.measureText('a b').width - plain - 20) < 0.5; }
+    catch (e) { /* unsupported */ }
+    try { g.wordSpacing = '0px'; } catch (e) { /* noop */ }
+    try { g.letterSpacing = '10px'; letterSpacing = Math.abs(g.measureText('a b').width - plain - 30) < 0.5; }
+    catch (e) { /* unsupported */ }
+    try { g.letterSpacing = '0px'; } catch (e) { /* noop */ }
+    try {
+      g.fontKerning = 'normal'; const on = g.measureText('AV').width;
+      g.fontKerning = 'none'; const off = g.measureText('AV').width;
+      g.fontKerning = 'auto'; fontKerning = on !== off;
+    } catch (e) { /* unsupported */ }
+    return { wordSpacing, letterSpacing, fontKerning, wordSpacingNative: wordSpacing };
+  })();
+
+  // The font's own advance for a space, measured directly. Deliberately not
+  // width('a a') - width('aa'): that subtraction also carries whatever kern
+  // the font applies between the probe letters. Spacing is zeroed first or the
+  // reading would include a letterSpacing unit, and restored after.
+  const spaceCache = new Map();
+  function baseSpace(family, weight, size) {
+    const key = `${weight}|${size}|${family}`;
+    let v = spaceCache.get(key);
+    if (v !== undefined) return v;
+    const hasLS = 'letterSpacing' in ctx, hasWS = 'wordSpacing' in ctx;
+    const ls = ctx.letterSpacing, ws = ctx.wordSpacing;
+    if (hasLS) ctx.letterSpacing = '0px';
+    if (hasWS) ctx.wordSpacing = '0px';
+    setFont(family, weight, size);
+    v = ctx.measureText(' ').width;
+    if (hasLS) ctx.letterSpacing = ls;
+    if (hasWS) ctx.wordSpacing = ws;
+    spaceCache.set(key, v);
+    return v;
+  }
+
+  // The advance a space should end up with, in px.
+  function wordAdvance(st, size) {
+    return (st.wordSpace !== undefined ? st.wordSpace : 0.2) * size;
+  }
+
+  // Sets font, tracking, word spacing and kerning together, so a measurement
+  // can never be taken under different settings than the drawing.
+  function setStyle(st, size) {
+    setFont(st.family, st.weight, size);
+    if (CAP.fontKerning) ctx.fontKerning = 'normal';
+    if (CAP.letterSpacing) ctx.letterSpacing = `${(st.tracking * size).toFixed(3)}px`;
+    if (CAP.wordSpacing) {
+      // letterSpacing has already been added to the space glyph; subtract it
+      // back out so tracking moves letters only.
+      ctx.wordSpacing = `${wordSpacingPx(st, size).toFixed(3)}px`;
+    } else if ('wordSpacing' in ctx) {
+      // Fallback path: the gaps are placed by hand, so nothing may be added
+      // to the space glyph on top of them.
+      ctx.wordSpacing = '0px';
+    }
+  }
+
+  // The px value the overlay needs for the same result. CSS word-spacing and
+  // letter-spacing treat the space glyph exactly as Canvas does.
+  function wordSpacingPx(st, size) {
+    return wordAdvance(st, size) - baseSpace(st.family, st.weight, size)
+         - (CAP.letterSpacing ? st.tracking * size : 0);
+  }
+
+  // Width of a whole line under the current style. Without native word
+  // spacing the gaps are added here, so wrapping measures what gets drawn.
+  function measureLine(text, st, size) {
+    setStyle(st, size);
+    if (CAP.wordSpacing) return ctx.measureText(text).width;
+    const words = text.split(' ');
+    if (words.length === 1) return ctx.measureText(text).width;
+    let w = 0;
+    for (const word of words) w += ctx.measureText(word).width;
+    return w + (words.length - 1) * wordAdvance(st, size);
+  }
+
+  // Draws one centred line. The fallback places each word itself, but never
+  // each character: splitting a word would break its shaping and kerning.
+  function drawLine(text, centreX, baseline, st, size) {
+    setStyle(st, size);
+    if (CAP.wordSpacing) {
+      ctx.textAlign = 'center';
+      ctx.fillText(text, centreX, baseline);
+      return;
+    }
+    const words = text.split(' ');
+    if (words.length === 1) {
+      ctx.textAlign = 'center';
+      ctx.fillText(text, centreX, baseline);
+      return;
+    }
+    const gap = wordAdvance(st, size);
+    const total = measureLine(text, st, size);
+    setStyle(st, size);
+    ctx.textAlign = 'left';
+    let x = centreX - total / 2;
+    for (let i = 0; i < words.length; i++) {
+      ctx.fillText(words[i], x, baseline);
+      x += ctx.measureText(words[i]).width + gap;
+    }
+    ctx.textAlign = 'center';
   }
 
   // Splits a token that is itself wider than the box. Without this a single
-  // long word never breaks and runs straight off both edges of the card.
+  // long word never breaks and runs straight off both edges of the card. Only
+  // an over-long token is ever split, and only here: ordinary words are always
+  // measured and drawn whole, so the font's shaping and kerning stay intact.
   function breakLongWord(word, maxWidth) {
     const pieces = [];
     let piece = '';
@@ -209,17 +333,19 @@
     return pieces;
   }
 
-  function wrap(text, family, weight, size, tracking, maxWidth) {
-    setFont(family, weight, size);
-    setTracking(tracking, size);
+  // Wrapping measures through measureLine, so the word spacing that will be
+  // drawn is the word spacing lines are fitted against.
+  function wrap(text, st, size, maxWidth) {
+    setStyle(st, size);
     const words = text.split(/\s+/).filter(Boolean);
     if (!words.length) return [];
     const lines = [];
     let line = '';
     for (const word of words) {
       const candidate = line ? `${line} ${word}` : word;
-      if (ctx.measureText(candidate).width <= maxWidth) { line = candidate; continue; }
+      if (measureLine(candidate, st, size) <= maxWidth) { line = candidate; continue; }
       if (line) { lines.push(line); line = ''; }
+      setStyle(st, size);
       if (ctx.measureText(word).width <= maxWidth) { line = word; continue; }
       const pieces = breakLongWord(word, maxWidth);
       lines.push(...pieces.slice(0, -1));
@@ -230,8 +356,8 @@
   }
 
   // Font metrics for the overlay's half-leading maths.
-  function metrics(family, weight, size) {
-    setFont(family, weight, size);
+  function metrics(st, size) {
+    setStyle(st, size);
     const m = ctx.measureText('Hg');
     return {
       ascent: m.actualBoundingBoxAscent || size * 0.75,
@@ -250,10 +376,9 @@
     const dekText = shown.dek ? readEditable(EDIT.dek) : '';
 
     const hs = headStyle();
-    const headLines = wrap(headlineText, hs.family, hs.weight, size, hs.tracking, BOX_W);
-    const dekLines = dekText ? wrap(dekText, DEK.family, DEK.weight, DEK.size, DEK.tracking, BOX_W) : [];
-    const eyeLines = eyebrowText
-      ? wrap(eyebrowText, EYEBROW.family, EYEBROW.weight, EYEBROW.size, EYEBROW.tracking, BOX_W) : [];
+    const headLines = wrap(headlineText, hs, size, BOX_W);
+    const dekLines = dekText ? wrap(dekText, DEK, DEK.size, BOX_W) : [];
+    const eyeLines = eyebrowText ? wrap(eyebrowText, EYEBROW, EYEBROW.size, BOX_W) : [];
 
     const logoH = Math.round(LOGO_WIDTH * (logoImg.height || 98) / (logoImg.width || 720));
     const logoBottom = H - LOGO_BOTTOM_MARGIN;
@@ -294,8 +419,7 @@
     const topBaseline = eyeBaselines.length ? eyeBaselines[0] : headBaselines[0];
     const topIsEyebrow = eyeBaselines.length > 0;
     const topSize = topIsEyebrow ? EYEBROW.size : size;
-    setFont(topIsEyebrow ? EYEBROW.family : hs.family,
-            topIsEyebrow ? EYEBROW.weight : hs.weight, topSize);
+    setStyle(topIsEyebrow ? EYEBROW : hs, topSize);
     const probe = ctx.measureText(eyeBaselines.length ? (eyeLines[0] || 'H') : (headLines[0] || 'H'));
     const ascent = probe.actualBoundingBoxAscent || topSize * 0.75;
     const top = (topBaseline ?? H) - ascent;
@@ -377,13 +501,10 @@
 
   /* ---------- render ---------- */
 
-  function drawLines(lines, baselines, family, weight, size, tracking) {
-    setFont(family, weight, size);
-    setTracking(tracking, size);
+  function drawLines(lines, baselines, st, size) {
     ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    lines.forEach((line, i) => ctx.fillText(line, CENTRE_X, baselines[i]));
+    lines.forEach((line, i) => drawLine(line, CENTRE_X, baselines[i], st, size));
   }
 
   function render() {
@@ -407,10 +528,12 @@
     if (!fontsReady) return;
     const l = chooseLayout();
     const hs = headStyle();
-    drawLines(l.eyeLines, l.eyeBaselines, EYEBROW.family, EYEBROW.weight, EYEBROW.size, EYEBROW.tracking);
-    drawLines(l.headLines, l.headBaselines, hs.family, hs.weight, l.size, hs.tracking);
-    drawLines(l.dekLines, l.dekBaselines, DEK.family, DEK.weight, DEK.size, DEK.tracking);
-    ctx.letterSpacing = '0px';
+    drawLines(l.eyeLines, l.eyeBaselines, EYEBROW, EYEBROW.size);
+    drawLines(l.headLines, l.headBaselines, hs, l.size);
+    drawLines(l.dekLines, l.dekBaselines, DEK, DEK.size);
+    // Leave no spacing set on the context for whatever draws next.
+    if (CAP.letterSpacing) ctx.letterSpacing = '0px';
+    if ('wordSpacing' in ctx) ctx.wordSpacing = '0px';
 
     if (logoImg.complete && logoImg.naturalWidth) {
       ctx.drawImage(logoImg, CENTRE_X - LOGO_WIDTH / 2, l.logoTop, LOGO_WIDTH, l.logoH);
@@ -430,12 +553,9 @@
   function syncEditables(l) {
     syncScale();
     const hs = headStyle();
-    placeEditable(EDIT.eyebrow, l.eyeLines, l.eyeBaselines, EYEBROW.family, EYEBROW.weight,
-      EYEBROW.size, EYEBROW.leading, EYEBROW.tracking, shown.eyebrow);
-    placeEditable(EDIT.headline, l.headLines, l.headBaselines, hs.family, hs.weight,
-      l.size, hs.leading, hs.tracking, true);
-    placeEditable(EDIT.dek, l.dekLines, l.dekBaselines, DEK.family, DEK.weight,
-      DEK.size, DEK.leading, DEK.tracking, shown.dek);
+    placeEditable(EDIT.eyebrow, l.eyeLines, l.eyeBaselines, EYEBROW, EYEBROW.size, shown.eyebrow);
+    placeEditable(EDIT.headline, l.headLines, l.headBaselines, hs, l.size, true);
+    placeEditable(EDIT.dek, l.dekLines, l.dekBaselines, DEK, DEK.size, shown.dek);
   }
 
   function reportSize(l) {
@@ -795,6 +915,11 @@
     picking: () => picking,
     headStyle: () => ({ ...headStyle(), key: headKey }),
     shown,
+    styles: { EYEBROW, DEK, HEAD_STYLES },
+    caps: () => ({ ...CAP }),
+    baseSpace, wordAdvance, wordSpacingPx, measureLine,
+    // Lets the harness exercise the no-native-word-spacing path.
+    forceFallback: (on) => { CAP.wordSpacing = on ? false : CAP.wordSpacingNative; render(); },
   };
 
   syncGradientEnabled();

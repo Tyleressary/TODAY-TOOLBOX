@@ -119,6 +119,43 @@ edit the copy, export a 1200×1500 JPG.
   logo 247×34 at y1417.
 - Type: eyebrow Source Sans 3 Black 38px/95%/+4% uppercase; headline Black
   100%/+1%; dek Medium 50px/110%/−2%. All white, centred, bottom-anchored.
+- **Word spacing, letter tracking and kerning are three independent controls.**
+  Canvas `letterSpacing` lands on the space glyph as well as on letters, so
+  before this each style's word gaps were decided by its tracking: +4% opened
+  the eyebrow's, −2% pinched the dek's to 0.180em, −1% pinched the serif
+  headline's to 0.150em, where `Serif Headline` rendered a 6px gap on a 100px
+  headline against 18px for `on of` on the same line — a 3.0× spread.
+
+  Each style now states the **total advance of a space** in em, and the
+  correction subtracts the tracking back out, so the two never move each other:
+  `wordSpacing = wordSpace·size − baseSpace − tracking·size`. Values are
+  headline 0.210em (both faces), eyebrow 0.240em, dek 0.200em — optical
+  consistency rather than one number everywhere; tracked all-caps need the
+  wider eyebrow value or they read as one run-on string. The serif's worst-case
+  gap goes 6px → 10px and its spread 3.0× → 2.4×; the sans headline is
+  unchanged (its correction works out to exactly 0px).
+
+  `baseSpace()` measures `measureText(' ')` with spacing zeroed and restored,
+  memoised per family|weight|size — deliberately not `width('a a') − width('aa')`,
+  which also carries whatever kern the font applies between the probe letters.
+
+  Kerning is the font's own: `fontKerning = 'normal'` on the canvas and
+  `font-kerning: normal` on the overlay, with **no correction table**. An audit
+  of 21 pairs at the production 100px found native kerning already active and
+  doing real work (`AV` −9.2px, `WA` −11.2px), zero overlapping ink, and a
+  minimum separation of 7.0px (`Ty`); checked again inside whole words, nothing
+  collides. The remaining variation in word gaps is the side bearings of
+  whichever letters meet — `f H` is always tighter than `i H` — and is not
+  something tracking or word spacing should be used to paper over.
+
+  Capability detection is by **behaviour, not presence**: the page probes that
+  `wordSpacing`, `letterSpacing` and `fontKerning` actually reach `measureText`
+  before relying on them. Without native word spacing, `measureLine()` sums word
+  widths plus the target advance and `drawLine()` places each word itself — never
+  each character, which would break shaping and kerning within a word. Wrapping
+  measures through `measureLine()`, so lines are fitted against the spacing that
+  will be drawn. No justification and no stretching: every gap on a line is the
+  same width whatever the line's length.
 - **Two headline fonts.** A Font control switches the headline between
   **Source Sans 3 Black**, which auto-sizes as below, and **Libre Bodoni Bold
   at a fixed 100px** (114% leading, −1% tracking) from its own Figma panel.
