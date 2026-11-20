@@ -54,6 +54,16 @@
   let headKey = 'sans';
   function headStyle() { return HEAD_STYLES[headKey]; }
 
+  // Placeholder copy that describes the face it is set in. Swapped when the
+  // font changes, but only while the headline is still untouched: the moment
+  // anything is typed it is the user's copy and is never overwritten.
+  const DEFAULT_HEAD = {
+    sans: 'Use Source Sans 3 Black at 65pt for Long Headlines and Keep Extended '
+        + 'Headline Treatments Within Four Lines Maximum',
+    serif: 'A Serif Headline Set in Libre Bodoni',
+  };
+  let headPristine = true;
+
   // Bottom-anchored gaps, measured from the reference.
   // Back-solved from the reference's two most reliable baselines: headline
   // line 4 has no descenders so its ink bottom (1204) is exactly its baseline,
@@ -787,6 +797,7 @@
 
   fontSelect.addEventListener('change', () => {
     headKey = fontSelect.value in HEAD_STYLES ? fontSelect.value : 'sans';
+    if (headPristine && DEFAULT_HEAD[headKey]) EDIT.headline.textContent = DEFAULT_HEAD[headKey];
     render();
   });
 
@@ -825,6 +836,9 @@
 
   // Typing never rewrites the editable's own content, so the caret is never
   // disturbed; render only reads from it and repaints the canvas beneath.
+  // Once the headline has been typed into, it is the user's copy.
+  EDIT.headline.addEventListener('input', () => { headPristine = false; });
+
   Object.values(EDIT).forEach((el) => {
     el.addEventListener('input', render);
     el.addEventListener('focus', () => stage.classList.add('is-editing'));
@@ -916,6 +930,8 @@
     headStyle: () => ({ ...headStyle(), key: headKey }),
     shown,
     styles: { EYEBROW, DEK, HEAD_STYLES },
+    pristine: () => headPristine,
+    defaults: { ...DEFAULT_HEAD },
     caps: () => ({ ...CAP }),
     baseSpace, wordAdvance, wordSpacingPx, measureLine,
     // Lets the harness exercise the no-native-word-spacing path.
