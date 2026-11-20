@@ -62,8 +62,10 @@
     sans: { label: 'Source Sans 3', family: SANS, weight: 900,
             min: 65, max: 90, leading: 1.00, tracking: 0.01, wordSpace: 0.210,
             gapEye: 77, gapDek: 72.5 },
+    // fixed is the design size; min is only reached when no acceptable
+    // composition exists at 100px -- see chooseLayout().
     serif: { label: 'Libre Bodoni', family: SERIF, weight: 700,
-             fixed: 100, leading: 1.14, tracking: -0.01, wordSpace: 0.210,
+             fixed: 100, min: 85, leading: 1.14, tracking: -0.01, wordSpace: 0.210,
              gapEye: 110, gapDek: 91.5 },
   };
   let headKey = 'sans';
@@ -449,6 +451,11 @@
     widowFrac: 0.45,
     // Any last line this far under the longest is an orphan sliver.
     shortFrac: 0.30,
+    // A single-word line that is NOT the last one reads as stranded when it
+    // is this far under the longest. 0.60 catches "American" (46% of its
+    // longest), "Downtown" (57%) and "Determined" (59%) while sparing
+    // "Transforming" (66%), a long word filling a fair share of the measure.
+    isolatedFrac: 0.60,
     // "Dramatically uneven": no line may fall below this share of the longest.
     evenFloor: 0.45,
     // Enumeration ceiling; hitting it falls back to greedy untouched.
@@ -478,7 +485,21 @@
     const oneWord = lines[lines.length - 1].trim().split(/\s+/).length === 1;
     if (oneWord && last < longest * TYPESET.widowFrac) return 'widow';
     if (last < longest * TYPESET.shortFrac) return 'short-last';
+    if (isolatedCount(lines, widths)) return 'isolated';
     return null;
+  }
+
+  // Single-word lines stranded in the middle of the block. Looking only at
+  // the last line let the widow fix trade one fault for another: clearing
+  // "Today" produced an isolated "American" at 460px under a 990px line.
+  function isolatedCount(lines, widths) {
+    const longest = Math.max(...widths);
+    if (!longest) return 0;
+    let n = 0;
+    for (let i = 0; i < lines.length - 1; i++) {
+      if (lines[i].trim().split(/\s+/).length === 1 && widths[i] < longest * TYPESET.isolatedFrac) n++;
+    }
+    return n;
   }
 
   // Summed squared shortfall from the longest line: penalises a short line
@@ -540,14 +561,16 @@
     let pool = clean.filter((c) => evenness(c) >= TYPESET.evenFloor);
     if (!pool.length) pool = clean;
 
-    // Phrase grouping first, then rag.
+    // Isolated interior lines first, then phrase grouping, then rag.
     let best = null, bestKey = null;
     for (const c of pool) {
       const phrase = c.lines.slice(0, -1).filter((l) => endsPhrase(l.split(' ').pop())).length;
-      const key = [phrase, raggedness(c.widths)];
-      if (!bestKey || key[0] < bestKey[0] || (key[0] === bestKey[0] && key[1] < bestKey[1])) {
-        best = c; bestKey = key;
-      }
+      const key = [isolatedCount(c.lines, c.widths), phrase, raggedness(c.widths)];
+      const better = !bestKey
+        || key[0] < bestKey[0]
+        || (key[0] === bestKey[0] && key[1] < bestKey[1])
+        || (key[0] === bestKey[0] && key[1] === bestKey[1] && key[2] < bestKey[2]);
+      if (better) { best = c; bestKey = key; }
     }
     return best ? best.lines : lines;
   }
@@ -690,9 +713,26 @@
       return p;
     };
     if (hs.fixed) {
-      const g = layout(hs.fixed);
-      const l = settle(hs.fixed, g);
-      return { ...l, overflow: l.rawTop < limit };
+      const atFixed = settle(hs.fixed, layout(hs.fixed));
+      // A fixed style holds its design size unless the composition at that
+      // size is genuinely unsalvageable. At 100px "Transforming American"
+      // measures 1130px against a 1000px measure, so some headlines have no
+      // fault-free arrangement there at all; those step down, nothing else
+      // does. Overflow is deliberately NOT a trigger: copy too long for the
+      // area still warns at the design size rather than being shrunk.
+      const faultAt = (l) => {
+        const w = l.headLines.map((t) => measureLine(t, hs, l.size));
+        return lineFault(l.headLines, w);
+      };
+      if (typeset && hs.min && faultAt(atFixed)) {
+        for (let size = hs.fixed - 1; size >= hs.min; size--) {
+          const cand = settle(size, layout(size));
+          if (!faultAt(cand) && cand.rawTop >= limit) {
+            return { ...cand, overflow: false, steppedDown: true };
+          }
+        }
+      }
+      return { ...atFixed, overflow: atFixed.rawTop < limit };
     }
     for (let size = hs.max; size >= hs.min; size--) {
       const g = layout(size);
@@ -1201,7 +1241,7 @@
     setAlign: (h, v) => { if (h) align.h = h; if (v) align.v = v; render(); },
     setTypeset: (on) => { typeset = !!on; typesetToggle.checked = !!on; render(); },
     typeset: () => typeset,
-    polishLines, lineFault, raggedness, endsPhrase, TYPESET,
+    polishLines, lineFault, isolatedCount, raggedness, endsPhrase, TYPESET,
     geom: { W, H, BOX_W, BOX_LEFT, SAFE_TOP, TOP_LIMIT, CENTRE_X },
     defaults: { ...DEFAULT_HEAD },
     caps: () => ({ ...CAP }),

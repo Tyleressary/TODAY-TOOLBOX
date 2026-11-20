@@ -222,15 +222,38 @@ edit the copy, export a 1200×1500 JPG.
   ending as a *fault* rewrote the reference dek and destroyed that same rag to
   avoid ending on "the".
 
+  **Isolated interior lines count too.** Looking only at the last line let the
+  widow fix trade one fault for another: clearing `Today` produced an isolated
+  `American` at 460px under a 990px line. A single-word line that is not the
+  last, and falls under 60% of the longest, is now a fault in its own right
+  and ranks ahead of phrase grouping in the scoring. The threshold catches
+  `American` (46% of its longest), `Downtown` (57%) and `Determined` (59%)
+  while sparing `Transforming` (66%) — a long word filling a fair share of the
+  measure does not read as stranded. Across the 48-headline corpus this takes
+  isolated lines from three to none.
+
   Because the line count is fixed to greedy's and the pass runs after the size
   sweep, it **cannot** move the font, size, tracking, word spacing, kerning,
   leading, the gaps between blocks, the ≤3-line rule or any baseline. Only
   where words break. The Typeset toggle turns it off and restores plain greedy
   exactly.
 
-  There is no grammar model: "phrase grouping" is the function-word and numeral
-  rule above. It is a real editorial convention and catches the common cases,
-  but it cannot recognise an arbitrary noun phrase.
+  **One narrow exception.** Some copy has no fault-free arrangement at Libre
+  Bodoni's fixed 100px at all: in `The Quiet Revolution Transforming American
+  Kitchens Today`, `Revolution Transforming` measures 1175px and `Transforming
+  American` 1130px against a 1000px measure, so `Transforming` is stuck alone
+  whatever the engine does, and only two 4-line arrangements fit — a widow or
+  an isolated word. There the serif steps down 1px at a time to a floor of
+  85px, taking the largest size whose composition is fault-free and still
+  fits; this headline lands on 88px as 871 / 995 / 631. Exactly one of the 24
+  serif corpus headlines steps at all. **Overflow is not a trigger**: copy too
+  long for the text area still warns at 100px and is never shrunk.
+
+  There is no grammar model: "phrase grouping" is the function-word, numeral
+  and isolation rules above. They are real editorial conventions and catch the
+  common cases, but they cannot recognise an arbitrary noun phrase — and in a
+  title-case headline every word is capitalised, so there is no signal to tell
+  an adjective from the noun it modifies without a part-of-speech tagger.
 
   The overlay is given the canvas's breaks as newlines (`.edit-text` is
   `pre-wrap`), because the two previously agreed only by both being greedy.
