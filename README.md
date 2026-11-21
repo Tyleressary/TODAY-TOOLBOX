@@ -259,10 +259,48 @@ edit the copy, export a 1200×1500 JPG.
   `pre-wrap`), because the two previously agreed only by both being greedy.
   That rewrite is allowed **only** as a whitespace-for-whitespace swap at
   identical positions — never a change in length. Anything else is refused,
-  since mid-word the user's text legitimately differs from the trimmed,
-  wrapped version: typing a space gives `My ` against a wanted `My`, and
-  rewriting there ate the character just typed. Equal length also means the
-  caret offset survives untouched.
+  since rewriting there would eat the character just typed. Equal length also
+  means the caret offset survives untouched.
+- **The editable's text is the single source of truth, and the canvas renders
+  it verbatim.** This is what makes the caret reliable. Previously the canvas
+  drew `readEditable()`'s normalised text — `\s+` collapsed, ends trimmed —
+  while the overlay held the raw text. The newline mirror above can only apply
+  when the two are the same length, so the moment they differed the mirror was
+  refused and the overlay fell back to the browser's own greedy wrapping while
+  the canvas used engine-chosen breaks. The two layers then disagreed about
+  which words were on which line. Measured, caret against glyph: **0px on
+  clean text, but 551px with a trailing space, and 722–891px on a long
+  headline** — and a trailing space exists for the interval after every space
+  the user types. With a double space the canvas's lines were not even
+  substrings of the overlay's text, so no mapping existed at all.
+
+  Now line breaking runs on **break-opportunity indices** into the raw string:
+  a break consumes exactly one whitespace character and the overlay gets `\n`
+  in its place, so the mirror is length-preserving *by construction* and
+  always applies. Lines may carry a leading or trailing space when the user
+  typed a run of them, and the canvas centres them including that space —
+  which is exactly what CSS `pre-wrap` does, verified at 364.4px on both
+  sides. Caret and glyph now measure **0px apart in every state**.
+
+  Normalisation happens **once, on blur**: while a block has focus you see
+  precisely what you typed, and clicking away collapses repeated spaces and
+  trims the ends so the card and the JPG are clean.
+
+  The eyebrow needed its own fix: the canvas uppercases it while its overlay
+  was `text-transform: none`, so the two measured different glyphs —
+  `Breaking news today` is 386.2px against 432.7px — drifting the caret up to
+  23px. The overlay now carries the matching transform. Uppercasing is
+  length-preserving for Latin, which is what keeps those offsets one-to-one; a
+  character whose uppercase form is longer, such as German `ß` → `SS`, would
+  shift the eyebrow caret by one.
+
+  The one case the mirror cannot cover is a single token wider than the whole
+  measure, where the break falls inside a word and cannot be a
+  whitespace-for-whitespace swap. There the browser breaks the word itself and
+  any drift is bounded by that word.
+
+  `placeEditable()` also writes a style property only when its value actually
+  changed, so the active element's geometry is not churned on every keystroke.
 - **Text layout: two independent settings.** **Align** (Original / Left /
   Centre) and **Place** (Original / Top / Centre), freely combinable.
   Original/Original reproduces the existing design exactly — the default-state

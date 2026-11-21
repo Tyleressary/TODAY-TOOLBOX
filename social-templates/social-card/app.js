@@ -161,8 +161,19 @@
 
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
+  // The editable's own characters, verbatim. The only transformation is
+  // mapping our injected line-break newlines back to the single space each
+  // one replaced -- that swap is length-preserving, so this is exactly what
+  // the user typed. The canvas renders THIS, which is what keeps the caret
+  // and the glyphs on the same layout.
+  function blockText(el) {
+    return (el.textContent || '').replace(/\n/g, ' ');
+  }
+
+  // Tidied form. Used for the commit on blur, and for comparisons such as
+  // the pristine-placeholder check -- never for rendering while editing.
   function readEditable(el) {
-    return (el.textContent || '').replace(/\s+/g, ' ').trim();
+    return blockText(el).replace(/\s+/g, ' ').trim();
   }
 
   // Lays each editable box exactly over the type the canvas draws, so the
@@ -220,6 +231,10 @@
     if (focused && off !== null) setCaretOffset(el, off);
   }
 
+  function setStyles(el, props) {
+    for (const k in props) if (el.style[k] !== props[k]) el.style[k] = props[k];
+  }
+
   function placeEditable(el, lines, baselines, st, size, visible) {
     if (!visible) { el.hidden = true; return; }
     el.hidden = false;
@@ -231,7 +246,9 @@
     const firstBaseline = baselines.length ? baselines[0] : H - 200;
     // CSS puts half the leading above the ascent; undo that to hit the baseline.
     const top = firstBaseline - m.fontAscent - (lineH - (m.fontAscent + m.fontDescent)) / 2;
-    Object.assign(el.style, {
+    // Write a property only when it actually changes: churning the active
+    // element's geometry on every keystroke is a way to disturb the caret.
+    setStyles(el, {
       textAlign: alignLeft() ? 'left' : 'center',
       left: `${BOX_LEFT}px`,
       width: `${BOX_W}px`,
@@ -419,24 +436,63 @@
 
   // Wrapping measures through measureLine, so the word spacing that will be
   // drawn is the word spacing lines are fitted against.
+  // Every index at which a line may break: one whitespace character, which
+  // the break consumes. Because exactly one character goes, the lines
+  // rejoined with '\n' have the raw text's length and differ from it only at
+  // whitespace positions -- which is what keeps the overlay's caret offsets
+  // mapped one-to-one onto the canvas's glyphs.
+  function breakOps(text) {
+    const ops = [];
+    for (let i = 0; i < text.length; i++) if (/\s/.test(text[i])) ops.push(i);
+    return ops;
+  }
+
+  function sliceLines(text, breaks) {
+    const lines = [];
+    let start = 0;
+    for (const b of breaks) { lines.push(text.slice(start, b)); start = b + 1; }
+    lines.push(text.slice(start));
+    return lines;
+  }
+
+  // Greedy wrap over the raw string. Whitespace is preserved exactly: a line
+  // may carry a leading or trailing space when the user typed a run of them,
+  // and the canvas centres it including that space -- which is precisely what
+  // CSS does with white-space: pre-wrap, so the two agree.
   function wrap(text, st, size, maxWidth) {
     setStyle(st, size);
-    const words = text.split(/\s+/).filter(Boolean);
-    if (!words.length) return [];
-    const lines = [];
-    let line = '';
-    for (const word of words) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (measureLine(candidate, st, size) <= maxWidth) { line = candidate; continue; }
-      if (line) { lines.push(line); line = ''; }
-      setStyle(st, size);
-      if (ctx.measureText(word).width <= maxWidth) { line = word; continue; }
-      const pieces = breakLongWord(word, maxWidth);
-      lines.push(...pieces.slice(0, -1));
-      line = pieces[pieces.length - 1] || '';
+    if (!text) return [];
+    const ops = breakOps(text);
+    const breaks = [];
+    let start = 0;
+    let guard = 0;
+    while (guard++ < 1000) {
+      if (measureLine(text.slice(start), st, size) <= maxWidth) break;
+      let chosen = -1;
+      for (let k = 0; k < ops.length; k++) {
+        const b = ops[k];
+        if (b <= start) continue;
+        if (measureLine(text.slice(start, b), st, size) <= maxWidth) chosen = b;
+        else break;
+      }
+      if (chosen < 0) {
+        // The first token is itself wider than the measure. Splitting inside
+        // a word cannot be mirrored length-preservingly, so the overlay falls
+        // back to the browser's own break-word for this block.
+        let nextOp = -1;
+        for (const b of ops) if (b > start) { nextOp = b; break; }
+        const end = nextOp < 0 ? text.length : nextOp;
+        setStyle(st, size);
+        const pieces = breakLongWord(text.slice(start, end), maxWidth);
+        const head = sliceLines(text, breaks).slice(0, -1);
+        const rest = nextOp < 0 ? '' : text.slice(nextOp + 1);
+        const tail = rest ? wrap(rest, st, size, maxWidth) : [];
+        return [...head, ...pieces, ...tail];
+      }
+      breaks.push(chosen);
+      start = chosen + 1;
     }
-    if (line) lines.push(line);
-    return lines;
+    return sliceLines(text, breaks);
   }
 
   /* ---------- editorial line breaking ---------- */
@@ -482,7 +538,7 @@
     const longest = Math.max(...widths);
     const last = widths[widths.length - 1];
     if (!longest) return null;
-    const oneWord = lines[lines.length - 1].trim().split(/\s+/).length === 1;
+    const oneWord = lines[lines.length - 1].trim().split(/\s+/).filter(Boolean).length === 1;
     if (oneWord && last < longest * TYPESET.widowFrac) return 'widow';
     if (last < longest * TYPESET.shortFrac) return 'short-last';
     if (isolatedCount(lines, widths)) return 'isolated';
@@ -497,7 +553,8 @@
     if (!longest) return 0;
     let n = 0;
     for (let i = 0; i < lines.length - 1; i++) {
-      if (lines[i].trim().split(/\s+/).length === 1 && widths[i] < longest * TYPESET.isolatedFrac) n++;
+      const n1 = lines[i].trim().split(/\s+/).filter(Boolean).length;
+      if (n1 === 1 && widths[i] < longest * TYPESET.isolatedFrac) n++;
     }
     return n;
   }
@@ -510,48 +567,54 @@
   }
 
   // Every arrangement with the SAME line count whose lines all fit, pruned on
-  // width. The line count is fixed, which is what makes the chosen font size,
-  // the baselines and every gap impossible to disturb.
-  function breakCandidates(words, count, st, size) {
-    const n = words.length;
-    const out = [];
+  // width. Breaks are indices into the raw string, so each candidate's lines
+  // rejoin to exactly the user's characters. The line count is fixed, which
+  // is what makes the chosen font size, the baselines and every gap
+  // impossible to disturb.
+  function breakCandidates(text, count, st, size) {
+    const ops = breakOps(text);
+    if (count - 1 > ops.length) return [];
+    const res = [];
     const cache = new Map();
-    const width = (i, j) => {
-      const key = i + ':' + j;
+    const width = (a, b) => {
+      const key = a + ':' + b;
       let v = cache.get(key);
-      if (v === undefined) { v = measureLine(words.slice(i, j).join(' '), st, size); cache.set(key, v); }
+      if (v === undefined) { v = measureLine(text.slice(a, b), st, size); cache.set(key, v); }
       return v;
     };
     let capped = false;
-    const walk = (i, left, acc) => {
+    const walk = (start, left, acc, from) => {
       if (capped) return;
-      if (out.length >= TYPESET.maxCandidates) { capped = true; return; }
+      if (res.length >= TYPESET.maxCandidates) { capped = true; return; }
       if (left === 1) {
-        const w = width(i, n);
-        if (w <= BOX_W) out.push([...acc, [i, n]]);
+        if (start < text.length && width(start, text.length) <= BOX_W) res.push([...acc]);
         return;
       }
-      for (let j = i + 1; j <= n - (left - 1); j++) {
-        if (width(i, j) > BOX_W) break;   // longer prefixes only get wider
-        walk(j, left - 1, [...acc, [i, j]]);
+      for (let k = from; k < ops.length; k++) {
+        const b = ops[k];
+        if (b <= start) continue;
+        if (width(start, b) > BOX_W) break;   // longer prefixes only get wider
+        walk(b + 1, left - 1, [...acc, b], k + 1);
       }
     };
-    walk(0, count, []);
+    walk(0, count, [], 0);
     if (capped) return null;
-    return out.map((segs) => ({
-      lines: segs.map(([a, b]) => words.slice(a, b).join(' ')),
-      widths: segs.map(([a, b]) => width(a, b)),
-    }));
+    return res
+      .map((breaks) => {
+        const lines = sliceLines(text, breaks);
+        return { lines, widths: lines.map((l) => measureLine(l, st, size)) };
+      })
+      // A break either side of a whitespace run would leave a blank line.
+      .filter((c) => c.lines.every((l) => l.trim().length));
   }
 
-  function polishLines(lines, st, size) {
+  function polishLines(text, lines, st, size) {
     if (!typeset || lines.length < 2) return lines;
     const widths = lines.map((t) => measureLine(t, st, size));
     if (!lineFault(lines, widths)) return lines;          // already fine
 
-    const words = lines.join(' ').split(/\s+/).filter(Boolean);
-    const cands = breakCandidates(words, lines.length, st, size);
-    if (!cands) return lines;                             // hit the cap
+    const cands = breakCandidates(text, lines.length, st, size);
+    if (!cands || !cands.length) return lines;            // hit the cap, or none
 
     const clean = cands.filter((c) => !lineFault(c.lines, c.widths));
     if (!clean.length) return lines;                      // no cure; leave it
@@ -564,7 +627,7 @@
     // Isolated interior lines first, then phrase grouping, then rag.
     let best = null, bestKey = null;
     for (const c of pool) {
-      const phrase = c.lines.slice(0, -1).filter((l) => endsPhrase(l.split(' ').pop())).length;
+      const phrase = c.lines.slice(0, -1).filter((l) => endsPhrase(l.trim().split(/\s+/).pop())).length;
       const key = [isolatedCount(c.lines, c.widths), phrase, raggedness(c.widths)];
       const better = !bestKey
         || key[0] < bestKey[0]
@@ -591,18 +654,22 @@
 
   // Builds the bottom-anchored stack and reports where its top edge lands.
   function layout(size, polish) {
-    const eyebrowText = shown.eyebrow ? readEditable(EDIT.eyebrow).toUpperCase() : '';
-    const headlineText = readEditable(EDIT.headline);
-    const dekText = shown.dek ? readEditable(EDIT.dek) : '';
+    // Raw, so the canvas draws the characters the editable holds. Uppercasing
+    // is length-preserving for Latin, and the eyebrow's overlay carries the
+    // matching text-transform, so its offsets stay one-to-one too.
+    const eyebrowText = shown.eyebrow ? blockText(EDIT.eyebrow).toUpperCase() : '';
+    const headlineText = blockText(EDIT.headline);
+    const dekText = shown.dek ? blockText(EDIT.dek) : '';
 
     const hs = headStyle();
     // The sweep wraps greedily; only the winning size is polished, so the
     // engine runs once per render rather than at all 26 candidate sizes.
-    const P = (lines, st, sz) => (polish ? polishLines(lines, st, sz) : lines);
-    const headLines = P(wrap(headlineText, hs, size, BOX_W), hs, size);
-    const dekLines = dekText ? P(wrap(dekText, DEK, DEK.size, BOX_W), DEK, DEK.size) : [];
-    const eyeLines = eyebrowText
-      ? P(wrap(eyebrowText, EYEBROW, EYEBROW.size, BOX_W), EYEBROW, EYEBROW.size) : [];
+    const P = (txt, lines, st, sz) => (polish ? polishLines(txt, lines, st, sz) : lines);
+    const headLines = P(headlineText, wrap(headlineText, hs, size, BOX_W), hs, size);
+    const dekLines = dekText.trim()
+      ? P(dekText, wrap(dekText, DEK, DEK.size, BOX_W), DEK, DEK.size) : [];
+    const eyeLines = eyebrowText.trim()
+      ? P(eyebrowText, wrap(eyebrowText, EYEBROW, EYEBROW.size, BOX_W), EYEBROW, EYEBROW.size) : [];
 
     const logoH = Math.round(LOGO_WIDTH * (logoImg.height || 98) / (logoImg.width || 720));
     const logoBottom = H - LOGO_BOTTOM_MARGIN;
@@ -611,7 +678,7 @@
     // Walk upward from the logo.
     let dekBaselines = [];
     let cursor;
-    if (dekLines.length || (shown.dek && !dekText)) {
+    if (dekLines.length || (shown.dek && !dekText.trim())) {
       const n = Math.max(1, dekLines.length);
       const lastDekBaseline = logoTop - GAP_DEK_LOGO;
       for (let i = n - 1; i >= 0; i--) {
@@ -631,7 +698,7 @@
     }
 
     const eyeBaselines = [];
-    if (eyeLines.length || (shown.eyebrow && !eyebrowText)) {
+    if (eyeLines.length || (shown.eyebrow && !eyebrowText.trim())) {
       const n = Math.max(1, eyeLines.length);
       const lastEye = (headBaselines[0] ?? cursor) - hs.gapEye;
       for (let i = n - 1; i >= 0; i--) {
@@ -1148,7 +1215,17 @@
   Object.values(EDIT).forEach((el) => {
     el.addEventListener('input', render);
     el.addEventListener('focus', () => stage.classList.add('is-editing'));
-    el.addEventListener('blur', () => { stage.classList.remove('is-editing'); render(); });
+    el.addEventListener('blur', () => {
+      stage.classList.remove('is-editing');
+      // Commit: while focused the canvas shows exactly what was typed, so the
+      // caret can track it. Tidy the stray whitespace once, on the way out.
+      const tidy = readEditable(el);
+      if (blockText(el).trim() !== '' && el.textContent.replace(/\n/g, ' ') !== tidy) {
+        el.textContent = tidy;
+      }
+      stage.classList.remove('is-editing');
+      render();
+    });
     // Keep it plain text: no pasted markup, no newlines (wrapping is automatic).
     el.addEventListener('paste', (e) => {
       e.preventDefault();
@@ -1241,7 +1318,7 @@
     setAlign: (h, v) => { if (h) align.h = h; if (v) align.v = v; render(); },
     setTypeset: (on) => { typeset = !!on; typesetToggle.checked = !!on; render(); },
     typeset: () => typeset,
-    polishLines, lineFault, isolatedCount, raggedness, endsPhrase, TYPESET,
+    polishLines, blockText, lineFault, isolatedCount, raggedness, endsPhrase, TYPESET,
     geom: { W, H, BOX_W, BOX_LEFT, SAFE_TOP, TOP_LIMIT, CENTRE_X },
     defaults: { ...DEFAULT_HEAD },
     caps: () => ({ ...CAP }),
