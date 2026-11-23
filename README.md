@@ -232,6 +232,20 @@ edit the copy, export a 1200×1500 JPG.
   measure does not read as stranded. Across the 48-headline corpus this takes
   isolated lines from three to none.
 
+  **The cap counts work, not just results.** `maxCandidates` bounds the
+  arrangements that *succeed*, and on a headline too long to fit almost none
+  do — the last line overruns the measure, so the path is dropped without ever
+  being counted. The walk is exponential in line count, so the result cap
+  never fired and typing a very long headline froze the page: measured at
+  1.9M explored nodes for 9 lines, 11M for 10, 65M for 11 and 383M for 12,
+  that last costing **65 seconds for a single keystroke**. A node budget
+  (`maxNodes`) now bounds the search itself and falls back to greedy exactly
+  as the result cap does. Typing a 389-character headline went from over four
+  minutes, still climbing, to 6.9s end to end — about 17ms a keystroke. Every
+  headline that genuinely gets typeset is far below the ceiling: the heaviest
+  real case measured is 133 nodes against a budget of 20,000, so no current
+  output changes, and the default export hash is unmoved.
+
   Because the line count is fixed to greedy's and the pass runs after the size
   sweep, it **cannot** move the font, size, tracking, word spacing, kerning,
   leading, the gaps between blocks, the ≤3-line rule or any baseline. Only

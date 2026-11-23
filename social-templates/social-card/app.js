@@ -522,6 +522,17 @@
     evenFloor: 0.45,
     // Enumeration ceiling; hitting it falls back to greedy untouched.
     maxCandidates: 4000,
+    // Work ceiling, which is a different thing: maxCandidates counts
+    // arrangements that SUCCEED, and on a headline too long to fit almost
+    // none do -- the last line overruns the measure, so the path is dropped
+    // without ever being counted. The walk is exponential in line count
+    // (measured: 1.9M nodes at 9 lines, 11M at 10, 65M at 11, 383M at 12,
+    // the last costing 65s for a single keystroke) so the result cap alone
+    // never fires and typing freezes the page. Counting nodes bounds the
+    // work itself. Every headline that actually gets typeset is far below
+    // this: the heaviest real case measured is 133 nodes, so the ceiling is
+    // ~150x the worst genuine need and changes no current output.
+    maxNodes: 20000,
   };
 
   // Words that govern what follows, so a line should not end on one. This is
@@ -589,9 +600,10 @@
       return v;
     };
     let capped = false;
+    let budget = TYPESET.maxNodes;
     const walk = (start, left, acc, from) => {
       if (capped) return;
-      if (res.length >= TYPESET.maxCandidates) { capped = true; return; }
+      if (--budget < 0 || res.length >= TYPESET.maxCandidates) { capped = true; return; }
       if (left === 1) {
         if (start < text.length && width(start, text.length) <= BOX_W) res.push([...acc]);
         return;
