@@ -378,6 +378,52 @@ edit the copy, export a 1200×1500 JPG.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
 
+## Punctuation and typography
+
+Straight quotation marks, double hyphens and three-period ellipses must never
+reach a finished graphic. The full standard is recorded in `CLAUDE.md`; the
+mechanism is `assets/smart-punctuation.js`, a single shared converter loaded by
+every tool that places free text on an image: the Social Card (eyebrow,
+headline, dek), Word Explain (the word) and the Challenge Calendar (band title,
+day label, day fills). The other three tools take only a filename, which never
+appears on the image.
+
+It exposes `window.smartPunctuation(text)` and, for the pre-delivery proofread,
+`smartPunctuation.findStraight(text)`.
+
+- Three or more periods become `…`.
+- Ranges become an en dash: `2025-2026`, `Monday-Friday`, `9 a.m.-5 p.m.`
+- `--`, and a hyphen standing alone between words, become an em dash, set
+  closed up with no surrounding spaces, per American editorial style.
+- `"` and `'` become curly by context. An apostrophe between or after
+  alphanumerics is `’`; at the start of a word it is `’` before digits
+  (`’90s`) or a known elision (`’n`, `’tis`, `’em`, `’cause`, `’round`,
+  `’til`) and an opening `‘` otherwise.
+- Hyphens are otherwise left alone: `award-winning`, `behind-the-scenes` and
+  `first-ever` keep theirs.
+
+**Rule order is load-bearing.** The en-dash range rule runs before the
+spaced-hyphen em-dash rule. Reversed, `9 a.m. - 5 p.m.` turns into an em dash
+before the range rule ever sees it. The `--` substitution also leaves its
+surrounding spaces behind, so a closing pass strips literal spaces either side
+of an em dash — literal spaces only, because a newline there is a line break the
+Social Card depends on.
+
+Conversion runs on **paste** and on **blur**, not on every keystroke: it reuses
+the commit-on-blur that already normalises whitespace, so no new
+caret-shifting logic enters the editor. Straight quotes are visible while you
+type a block and turn curly when you click away. The Social Card's Download
+handler also commits any still-focused block and re-renders before reading the
+canvas, so an export cannot carry straight punctuation even if blur has not
+fired. The converter is idempotent by construction and by test, since it runs
+again on every blur.
+
+Known limits: `5'10"` becomes `5’10”`, not the primes `5′10″` — primes are outside
+the stated standard and are not invented here. Quote direction is contextual
+rather than parsed, so something unusual may still need a manual fix. And a
+hyphen used as a deliberate separator between words becomes an em dash, because
+a spaced hyphen between words is exactly the incorrect form the standard names.
+
 ## Design system
 
 Shared in `assets/toolbox.css` and used by every page.

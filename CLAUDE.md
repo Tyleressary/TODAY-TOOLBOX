@@ -1,0 +1,105 @@
+# TODAY Toolbox — working rules
+
+## Typography and punctuation: a mandatory standard
+
+Every graphic this repository produces, and every piece of copy written for
+one, uses real typographic punctuation. This is a quality-control standard,
+not a design preference. It is applied automatically, every time, without
+being asked.
+
+### 1. Curly quotation marks and apostrophes — always
+
+- Double quotes: `“ ”` — never `"`
+- Single quotes and apostrophes: `‘ ’` — never `'`
+
+Correct: `The chef said, “It’s the best dish we’ve made.”`
+Incorrect: `The chef said, "It's the best dish we've made."`
+
+### 2. Em dash `—`
+
+For a break in thought, an abrupt shift, or an emphatic aside. Set it
+closed up, with no spaces either side, per standard American editorial
+style.
+
+Correct: `This dish—rich, smoky, unforgettable—defines the menu.`
+Incorrect: `This dish - rich, smoky, unforgettable - defines the menu.`
+Incorrect: `This dish -- rich, smoky, unforgettable -- defines the menu.`
+
+### 3. En dash `–`
+
+For ranges and spans only.
+
+Correct: `2025–2026`, `Monday–Friday`, `9 a.m.–5 p.m.`
+Incorrect: `2025-2026`, `Monday-Friday`
+
+### 4. Ellipsis `…`
+
+One character, never three periods.
+
+Correct: `And then…everything changed.`
+Incorrect: `And then...everything changed.`
+
+### 5. Hyphens `-`
+
+Only where grammar calls for one: compound modifiers and hyphenated words.
+Never as a substitute for an em dash or an en dash.
+
+Correct: `award-winning`, `behind-the-scenes`, `first-ever`
+
+### 6. Copied and pasted text is never trusted
+
+Text pasted from anywhere — a CMS, a doc, an email, a message — is assumed
+to carry straight quotes, double hyphens and three-period ellipses. It is
+converted on arrival. Wording, spelling, meaning and intended punctuation
+are preserved exactly; only punctuation *characters* change. Approved copy
+is never rewritten to suit these rules.
+
+### 7. Final proofread before anything is presented or exported
+
+Before a graphic is shown, described or exported, its text is checked for
+straight quotes, straight apostrophes, three-period ellipses, double
+hyphens and spaced hyphens. The same check applies to copy written in
+conversation.
+
+### 8. Non-negotiable
+
+Apply automatically. Do not wait to be asked, and do not treat a violation
+as a stylistic choice.
+
+## The mechanism
+
+`assets/smart-punctuation.js` is the single shared implementation. It
+exposes `window.smartPunctuation(text)` and
+`smartPunctuation.findStraight(text)` (the proofreading scan). Every tool
+that puts free text on a graphic loads it and converts on paste and on
+blur, before rendering.
+
+Rule order inside the converter is load-bearing: ellipsis, then en dash
+(ranges), then em dash, then quotes. The en dash must run first, or
+`9 a.m. - 5 p.m.` becomes an em dash before the range rule can see it.
+
+Any new tool that accepts free text loads the same file and wires the same
+two events. Do not reimplement the rules locally — three copies would
+drift.
+
+### Known limits
+
+- `5'10"` becomes `5’10”`, not the primes `5′10″`. Primes are outside the
+  stated standard and are not invented here.
+- Quote direction is contextual, not parsed. The elision list (`’n`,
+  `’tis`, `’em`, `’cause`, `’round`, `’til`, …) covers the common cases;
+  something unusual may still need a manual fix.
+- A hyphen used as a deliberate separator between words becomes an em dash,
+  because a spaced hyphen between words is exactly the incorrect form the
+  standard names.
+
+## Repository conventions
+
+- Plain static HTML, CSS and JS. No build step, no bundler, no framework.
+- One folder per tool; GitHub Pages serves `main` directly.
+- Local assets carry a `?v=N` cache-busting query. Bump the version on a
+  page when its own scripts or styles change.
+- `editorial-templates/calendar/calendar.css` is not edited.
+- The Social Card's default-state export hash is a regression invariant:
+  `643e123d7a860c45`. Changes that are meant to preserve the existing
+  design must leave it byte-identical.

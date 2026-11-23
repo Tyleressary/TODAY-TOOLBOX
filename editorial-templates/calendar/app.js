@@ -79,6 +79,20 @@
 
   /* ---------- Content tab ---------- */
 
+  // Editorial punctuation: convert on blur and on paste, never mid-keystroke,
+  // so the caret is never moved under the user. The export rasterises the
+  // live DOM, so converted characters flow through unchanged.
+  const smartText = (t) => (typeof window.smartPunctuation === 'function')
+    ? window.smartPunctuation(t) : t;
+  function wireSmartPunctuation(input, apply) {
+    const tidy = () => {
+      const t = smartText(input.value);
+      if (t !== input.value) { input.value = t; apply(t); }
+    };
+    input.addEventListener('blur', tidy);
+    input.addEventListener('paste', () => setTimeout(tidy, 0));
+  }
+
   // The calendar's name is its headline — editable here or on the calendar.
   nameInput.addEventListener('input', () => {
     current.headline = nameInput.value;
@@ -114,8 +128,15 @@
     save();
   });
 
+  wireSmartPunctuation(nameInput, (t) => {
+    current.headline = t; calendar.render(); filenameInput.placeholder = defaultFilename(); save();
+  });
+  wireSmartPunctuation(dayLabelInput, (t) => { current.dayLabel = t; calendar.render(); save(); });
+  wireSmartPunctuation(fillInput, () => {});   // read when Fill is pressed
+
   $('fillBtn').addEventListener('click', () => {
-    const text = fillInput.value;
+    const text = smartText(fillInput.value);
+    fillInput.value = text;
     const target = text === '' ? 'clear every day box' : `set every day box to "${text}"`;
     if (!confirm(`This will ${target}. Continue?`)) return;
     current.cells = current.cells.map(() => text);

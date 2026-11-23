@@ -176,6 +176,12 @@
     return blockText(el).replace(/\s+/g, ' ').trim();
   }
 
+  // Editorial punctuation, from the shared converter. Guarded so the page
+  // still works if the script is missing rather than throwing on blur.
+  function smartText(t) {
+    return (typeof window.smartPunctuation === 'function') ? window.smartPunctuation(t) : t;
+  }
+
   // Lays each editable box exactly over the type the canvas draws, so the
   // caret and selection land where the glyphs are. The text itself is
   // transparent -- the canvas underneath is what you actually see, which keeps
@@ -1219,7 +1225,7 @@
       stage.classList.remove('is-editing');
       // Commit: while focused the canvas shows exactly what was typed, so the
       // caret can track it. Tidy the stray whitespace once, on the way out.
-      const tidy = readEditable(el);
+      const tidy = smartText(readEditable(el));
       if (blockText(el).trim() !== '' && el.textContent.replace(/\n/g, ' ') !== tidy) {
         el.textContent = tidy;
       }
@@ -1229,7 +1235,8 @@
     // Keep it plain text: no pasted markup, no newlines (wrapping is automatic).
     el.addEventListener('paste', (e) => {
       e.preventDefault();
-      const t = (e.clipboardData || window.clipboardData).getData('text').replace(/\s+/g, ' ');
+      // Pasted copy is never assumed to be correctly typeset.
+      const t = smartText((e.clipboardData || window.clipboardData).getData('text').replace(/\s+/g, ' '));
       document.execCommand('insertText', false, t);
     });
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
@@ -1298,6 +1305,16 @@
   });
 
   downloadBtn.addEventListener('click', () => {
+    // Nothing leaves this tool with straight punctuation in it. Blur normally
+    // fires first, but commit every block anyway and repaint, so the export
+    // is both correct and still identical to the preview.
+    let dirty = false;
+    Object.values(EDIT).forEach((el) => {
+      const tidy = smartText(readEditable(el));
+      if (blockText(el).trim() !== '' && blockText(el) !== tidy) { el.textContent = tidy; dirty = true; }
+    });
+    if (dirty) render();
+
     const raw = filenameInput.value.trim() || 'social-card';
     const safe = raw.replace(/[^a-z0-9-_ ]/gi, '').trim().replace(/\s+/g, '-') || 'social-card';
     const a = document.createElement('a');

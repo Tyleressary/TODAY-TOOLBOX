@@ -134,6 +134,17 @@
 
   wordInput.addEventListener('input', render);
 
+  // Editorial punctuation: convert on blur and on paste, never mid-keystroke.
+  // Guarded so the page still works if the shared script is missing.
+  const smartText = (t) => (typeof window.smartPunctuation === 'function')
+    ? window.smartPunctuation(t) : t;
+  const tidyInput = (input) => {
+    const t = smartText(input.value);
+    if (t !== input.value) { input.value = t; render(); }
+  };
+  wordInput.addEventListener('blur', () => tidyInput(wordInput));
+  wordInput.addEventListener('paste', () => setTimeout(() => tidyInput(wordInput), 0));
+
   buildColorOptions(wordColorSelect, wordColor);
   wordColorSwatch.style.background = wordColor;
   wordColorSelect.addEventListener('change', (e) => {
