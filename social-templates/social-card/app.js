@@ -5,6 +5,17 @@
   const H = 1500;
   const MAX_ZOOM = 3;
 
+  // Circular image bubbles, measured off the supplied reference card at
+  // 1200x1500 rather than estimated: outer diameter 433 (a circle fit to the
+  // ring gave SD 0.67px), a 5.5px pure white ring, so the visible photo
+  // aperture is 422. No shadow -- the background luminance there is flat
+  // right up to the ring.
+  const BUBBLE_D = 433;
+  const BUBBLE_R = BUBBLE_D / 2;
+  const BUBBLE_RING = 5.5;
+  // Minimum air between two bubbles' rings, so a pair reads as a pair.
+  const BUBBLE_GAP = 16;
+
   // Canvas-only families, self-hosted. Canvas text must not depend on a
   // runtime font fetch: a fallback face would silently export off-brand type.
   const SANS = "'Source Sans 3 Canvas'";
@@ -25,6 +36,16 @@
   // the card's vertical centre. Top and centre placements deliberately work
   // above it, so there the limit is the top safe margin instead.
   const TOP_LIMIT = H / 2;
+
+  // Bubble guard rails. The edge inset is the text box's own, so no new
+  // margin is invented -- and it is exactly where the reference's left bubble
+  // sits. The clearance is measured too: a bubble over the lockup's x-range
+  // bottoms out at 1417 - 40 - 216.5 = 1160.5, which is precisely the
+  // reference's left-bubble centre. The design's own dek-to-logo air
+  // (GAP_DEK_LOGO 85.5 baseline to top, ~74.5 ink to top) corroborates the
+  // range from the other side.
+  const BUBBLE_EDGE = SAFE_TOP;
+  const BUBBLE_CLEAR = 40;
 
   // Text composition. 'original' reproduces the existing design exactly:
   // horizontally centred, vertically bottom-anchored to the logo.
@@ -131,11 +152,24 @@
   const eyebrowToggle = document.getElementById('eyebrowToggle');
   const dekToggle = document.getElementById('dekToggle');
   const sizeNote = document.getElementById('sizeNote');
+  const bubbleNote = document.getElementById('bubbleNote');
+  const bubbleRow = document.getElementById('bubbleRow');
+  const bubbleLayer = document.getElementById('bubbleLayer');
+  const SVGNS = 'http://www.w3.org/2000/svg';
   const filenameInput = document.getElementById('filename');
   const downloadBtn = document.getElementById('downloadBtn');
 
   const shown = { eyebrow: true, dek: true, gradient: true };
   let photo = null; // { img, scaleMultiplier, panX, panY }
+  // Two bubble slots. Each is null or a record carrying the same four panel
+  // fields as `photo`, so panelImageMetrics() and drawPanelImage() work on a
+  // bubble unchanged, plus its centre in canvas pixels and a panel thumbnail.
+  const bubbles = [null, null];
+  let selected = -1;      // index of the selected bubble, -1 for none
+  let adjusting = false;  // true => a drag pans the photo inside `selected`
+  let bubbleDrag = null;
+  let rescuing = false;
+  let lastLayout = null;  // the layout the last render used, for the guards
   let dragState = null;
   let fileDragOver = false;
   let fontsReady = false;
@@ -299,6 +333,55 @@
     const cx = bbox.minX + (bbox.maxX - bbox.minX) / 2 + panXpx;
     const cy = bbox.minY + (bbox.maxY - bbox.minY) / 2 + panYpx;
     g.drawImage(panel.img, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
+  }
+
+  // panX/panY are fractions OF THE BBOX, so a 433px bubble and the 1200x1500
+  // background cannot share a divisor. One helper, both callers.
+  function panBy(panel, bbox, dxPx, dyPx, startPanX, startPanY) {
+    const bw = bbox.maxX - bbox.minX;
+    const bh = bbox.maxY - bbox.minY;
+    panel.panX = (startPanX * bw + dxPx) / bw;
+    panel.panY = (startPanY * bh + dyPx) / bh;
+  }
+
+  /* ---------- image bubbles ---------- */
+
+  function bubbleBox(b) {
+    return { minX: b.cx - BUBBLE_R, maxX: b.cx + BUBBLE_R,
+             minY: b.cy - BUBBLE_R, maxY: b.cy + BUBBLE_R };
+  }
+
+  function drawBubble(b) {
+    if (!b || !b.img) return;
+    ctx.save();
+    // Clip at the OUTER radius and let the ring paint over the image's last
+    // 5.5px. Clipping at the aperture instead would leave the clip's own
+    // antialiased edge only half covered by the ring, which is where a seam
+    // comes from. Cover-fitting the outer square for the same reason: the
+    // image then covers every pixel the clip can expose.
+    ctx.beginPath();
+    ctx.arc(b.cx, b.cy, BUBBLE_R, 0, Math.PI * 2);
+    ctx.clip();
+    // Canvas state, so it is set inside the save: touching it globally would
+    // change how the background photo resamples on every existing card.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    drawPanelImage(b, bubbleBox(b));
+    ctx.restore();
+
+    ctx.save();
+    // A stroke straddles its path, so the path radius is the ring's mid-line:
+    // 216.5 - 5.5/2 = 213.75 spans 211..216.5. Outer 433, ring 5.5, photo 422.
+    ctx.beginPath();
+    ctx.arc(b.cx, b.cy, BUBBLE_R - BUBBLE_RING / 2, 0, Math.PI * 2);
+    ctx.lineWidth = BUBBLE_RING;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawBubbles() {
+    for (const b of bubbles) drawBubble(b);
   }
 
   /* ---------- text measuring ---------- */
@@ -656,6 +739,16 @@
     return best ? best.lines : lines;
   }
 
+  // The lockup's drawn box. layout() positions the logo from it and the
+  // bubble guard holds bubbles off it, so the arithmetic lives in one place
+  // and the two cannot drift.
+  function logoRect() {
+    const h = Math.round(LOGO_WIDTH * (logoImg.height || 98) / (logoImg.width || 720));
+    const y0 = H - LOGO_BOTTOM_MARGIN - h;
+    return { x0: CENTRE_X - LOGO_WIDTH / 2, x1: CENTRE_X + LOGO_WIDTH / 2,
+             y0, y1: y0 + h, h };
+  }
+
   // Font metrics for the overlay's half-leading maths.
   function metrics(st, size) {
     setStyle(st, size);
@@ -666,6 +759,183 @@
       fontAscent: m.fontBoundingBoxAscent || size * 0.8,
       fontDescent: m.fontBoundingBoxDescent || size * 0.2,
     };
+  }
+
+  /* ---------- bubble guard rails ---------- */
+
+  // Per-line ink rects for the three text blocks, from the same measurement
+  // path that drew them. Horizontal extents are the line's own measured
+  // width, so a short line really does leave room beside it. Vertical
+  // extents come from the STYLE's ascent and descent rather than the line's
+  // own ink, so the boundary does not jump 20px when a line happens to be
+  // all lowercase -- what a bubble is held off has to stay still while the
+  // copy is being typed.
+  function textBoxes(l) {
+    if (!l) return [];
+    // setStyle writes letterSpacing/wordSpacing on the context, and render()
+    // clears both before this runs. Save and restore them the way baseSpace()
+    // does, or the next thing drawn inherits a measuring state.
+    const hasLS = 'letterSpacing' in ctx, hasWS = 'wordSpacing' in ctx;
+    const ls = hasLS ? ctx.letterSpacing : null;
+    const ws = hasWS ? ctx.wordSpacing : null;
+    const left = alignLeft();
+    const out = [];
+    const block = (name, lines, baselines, st, size) => {
+      if (!baselines || !baselines.length) return;
+      const m = metrics(st, size);
+      // layout() reserves a baseline for an empty headline and for a shown
+      // but empty eyebrow or dek, so baselines can outnumber lines.
+      for (let i = 0; i < baselines.length; i++) {
+        const text = (lines && lines[i]) || '';
+        if (!text.trim()) continue;
+        const w = measureLine(text, st, size);
+        const x0 = left ? BOX_LEFT : CENTRE_X - w / 2;
+        out.push({ block: name, x0, x1: x0 + w,
+                   y0: baselines[i] - m.ascent, y1: baselines[i] + m.descent });
+      }
+    };
+    block('eyebrow', l.eyeLines, l.eyeBaselines, EYEBROW, EYEBROW.size);
+    block('headline', l.headLines, l.headBaselines, headStyle(), l.size);
+    block('dek', l.dekLines, l.dekBaselines, DEK, DEK.size);
+    if (hasLS) ctx.letterSpacing = ls;
+    if (hasWS) ctx.wordSpacing = ws;
+    return out;
+  }
+
+  // True minimum distance from the circle to the rect, so inflating the rect
+  // by pad gives a rounded keep-out -- "the ring stays pad away from the
+  // ink", not "the bubble's bounding box stays away from it".
+  function circleClearsRect(cx, cy, r, rect, pad) {
+    const dx = Math.max(rect.x0 - pad - cx, 0, cx - (rect.x1 + pad));
+    const dy = Math.max(rect.y0 - pad - cy, 0, cy - (rect.y1 + pad));
+    return dx * dx + dy * dy >= r * r;
+  }
+
+  function clampToSafe(cx, cy) {
+    return { cx: clamp(cx, BUBBLE_EDGE + BUBBLE_R, W - BUBBLE_EDGE - BUBBLE_R),
+             cy: clamp(cy, BUBBLE_EDGE + BUBBLE_R, H - BUBBLE_EDGE - BUBBLE_R) };
+  }
+
+  // The keep-out set for a drag: computed once at pointerdown, because text
+  // cannot reflow mid-drag and a boundary that jitters is unusable.
+  function keepOut(l) {
+    return { logo: logoRect(), text: textBoxes(l || lastLayout) };
+  }
+
+  // Is this centre legal for bubble i? Edges are clamped separately; this is
+  // the lockup, the type and the other bubble.
+  function bubbleLegal(i, cx, cy, ko) {
+    if (!circleClearsRect(cx, cy, BUBBLE_R, ko.logo, BUBBLE_CLEAR)) return false;
+    for (const r of ko.text) {
+      if (!circleClearsRect(cx, cy, BUBBLE_R, r, BUBBLE_CLEAR)) return false;
+    }
+    const other = bubbles[i === 0 ? 1 : 0];
+    if (other && Math.hypot(cx - other.cx, cy - other.cy) < BUBBLE_D + BUBBLE_GAP) return false;
+    return true;
+  }
+
+  // The smallest translation that takes the circle out of one inflated rect.
+  // Four candidates -- off each face -- and the nearest wins, which is what
+  // makes a dragged bubble hug the boundary it is pressed against instead of
+  // jumping to a corner.
+  function escapeRect(cx, cy, rect, pad) {
+    const out = [
+      { cx: rect.x0 - pad - BUBBLE_R, cy },
+      { cx: rect.x1 + pad + BUBBLE_R, cy },
+      { cx, cy: rect.y0 - pad - BUBBLE_R },
+      { cx, cy: rect.y1 + pad + BUBBLE_R },
+    ];
+    out.sort((a, b) => Math.hypot(a.cx - cx, a.cy - cy) - Math.hypot(b.cx - cx, b.cy - cy));
+    return out;
+  }
+
+  function firstBlocker(i, cx, cy, ko) {
+    if (!circleClearsRect(cx, cy, BUBBLE_R, ko.logo, BUBBLE_CLEAR)) return ko.logo;
+    for (const r of ko.text) {
+      if (!circleClearsRect(cx, cy, BUBBLE_R, r, BUBBLE_CLEAR)) return r;
+    }
+    return null;
+  }
+
+  // Move bubble i as close to (cx, cy) as the guards allow: push the circle
+  // straight back out of whatever it is touching, by the shortest distance,
+  // and repeat for anything that pushes it into something else. Falls back to
+  // one axis at a time, then to not moving at all.
+  function placeBubble(i, cx, cy, ko) {
+    const b = bubbles[i];
+    if (!b) return false;
+    const keep = ko || keepOut();
+    const commit = (p) => {
+      const moved = p.cx !== b.cx || p.cy !== b.cy;
+      b.cx = p.cx; b.cy = p.cy;
+      return moved;
+    };
+
+    let p = clampToSafe(cx, cy);
+    for (let iter = 0; iter < 6 && !bubbleLegal(i, p.cx, p.cy, keep); iter++) {
+      const other = bubbles[i === 0 ? 1 : 0];
+      const blocker = firstBlocker(i, p.cx, p.cy, keep);
+      if (blocker) {
+        let next = null;
+        for (const cand of escapeRect(p.cx, p.cy, blocker, BUBBLE_CLEAR)) {
+          const c = clampToSafe(cand.cx, cand.cy);
+          // The clamp can undo the escape at the card's edge; only take a
+          // candidate the clamp actually leaves clear of this blocker.
+          if (circleClearsRect(c.cx, c.cy, BUBBLE_R, blocker, BUBBLE_CLEAR)) { next = c; break; }
+        }
+        if (!next) break;
+        p = next;
+      } else if (other) {
+        // Pushed apart along the line between the two centres.
+        const dx = p.cx - other.cx, dy = p.cy - other.cy;
+        const d = Math.hypot(dx, dy) || 1;
+        const need = BUBBLE_D + BUBBLE_GAP;
+        p = clampToSafe(other.cx + dx / d * need, other.cy + dy / d * need);
+      } else break;
+    }
+    if (bubbleLegal(i, p.cx, p.cy, keep)) return commit(p);
+
+    // Cornered: try holding one axis, so a drag along a boundary still runs.
+    for (const q of [clampToSafe(cx, b.cy), clampToSafe(b.cx, cy)]) {
+      if (bubbleLegal(i, q.cx, q.cy, keep)) return commit(q);
+    }
+    return false;   // keep the last valid position
+  }
+
+  // The legal centre nearest to (cx, cy), searched outward in rings. Used for
+  // the first placement and to rescue a bubble the text has grown into.
+  function nearestClear(i, cx, cy, ko) {
+    const keep = ko || keepOut();
+    const start = clampToSafe(cx, cy);
+    if (bubbleLegal(i, start.cx, start.cy, keep)) return start;
+    for (let rad = 8; rad <= 1300; rad += 8) {
+      // Up first, then down, then sideways: vertical room is what a card
+      // with a bottom-anchored text block actually has.
+      for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0],
+                              [-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]]) {
+        const p = clampToSafe(cx + dx * rad, cy + dy * rad);
+        if (bubbleLegal(i, p.cx, p.cy, keep)) return p;
+      }
+    }
+    return null;
+  }
+
+  // Where a newly added bubble lands. Hug the safe margin horizontally the
+  // way the reference does -- its two bubbles sit at the left and right
+  // extremes -- then take the lowest clear centre, because the reference's
+  // composition is low on the card. With the copy hidden this lands on the
+  // reference position itself; with a full headline it lands above the type.
+  function defaultCentre(i, ko) {
+    const keep = ko || keepOut();
+    const near = BUBBLE_EDGE + BUBBLE_R;
+    const far = W - BUBBLE_EDGE - BUBBLE_R;
+    const xs = i === 0 ? [near, far, CENTRE_X] : [far, near, CENTRE_X];
+    for (const cx of xs) {
+      for (let cy = H - BUBBLE_EDGE - BUBBLE_R; cy >= near; cy -= 4) {
+        if (bubbleLegal(i, cx, cy, keep)) return { cx, cy };
+      }
+    }
+    return nearestClear(i, xs[0], near, keep) || { cx: xs[0], cy: near };
   }
 
   /* ---------- layout ---------- */
@@ -689,9 +959,7 @@
     const eyeLines = eyebrowText.trim()
       ? P(eyebrowText, wrap(eyebrowText, EYEBROW, EYEBROW.size, BOX_W), EYEBROW, EYEBROW.size) : [];
 
-    const logoH = Math.round(LOGO_WIDTH * (logoImg.height || 98) / (logoImg.width || 720));
-    const logoBottom = H - LOGO_BOTTOM_MARGIN;
-    const logoTop = logoBottom - logoH;
+    const { h: logoH, y0: logoTop } = logoRect();
 
     // Walk upward from the logo.
     let dekBaselines = [];
@@ -903,8 +1171,27 @@
     if (shown.gradient) drawGradient();
     syncColour();
 
+    // Above the background and the gradient, below all type and the lockup.
+    // Drawn before the font gate so a bubble never waits on a font load, and
+    // under the text so that the one degenerate case -- copy so long that no
+    // legal bubble position is left -- keeps the headline readable instead of
+    // running a white ring through it. With both slots empty this is two null
+    // checks: no pixel and no canvas state is touched.
+    drawBubbles();
+
     if (!fontsReady) return;
     const l = chooseLayout();
+    lastLayout = l;
+    // Text wins. If the copy has grown into a bubble, slide the bubble to the
+    // nearest legal centre and say so. The bubbles for this frame are already
+    // painted, so a rescue repaints from scratch; the flag stops that
+    // recursing, and it only ever happens on the frame a collision appears.
+    if (!rescuing && rescueBubbles(l)) {
+      rescuing = true;
+      render();
+      rescuing = false;
+      return;
+    }
     const hs = headStyle();
     drawLines(l.eyeLines, l.eyeBaselines, EYEBROW, EYEBROW.size);
     drawLines(l.headLines, l.headBaselines, hs, l.size);
@@ -919,7 +1206,213 @@
 
     drawDragHighlight();
     syncEditables(l);
+    syncBubbleLayer();
     reportSize(l);
+  }
+
+  // Text wins on reflow: any bubble the copy has grown into slides the
+  // shortest distance to a legal centre. Returns true when something moved,
+  // which means the frame has to be painted again.
+  function rescueBubbles(l) {
+    // Nothing to rescue, and nothing to measure: with no bubbles this costs
+    // one array check per render rather than a full pass over every line.
+    if (!bubbles[0] && !bubbles[1]) return false;
+    const ko = keepOut(l);
+    const notes = [];
+    let moved = false;
+    bubbles.forEach((b, i) => {
+      if (!b) return;
+      if (bubbleLegal(i, b.cx, b.cy, ko)) return;
+      const p = nearestClear(i, b.cx, b.cy, ko);
+      if (p) {
+        b.cx = p.cx; b.cy = p.cy;
+        moved = true;
+        notes.push(`Bubble ${i + 1} moved clear of the text.`);
+      } else {
+        notes.push(`Bubble ${i + 1} has nowhere clear to go — shorten the copy or remove it.`);
+      }
+    });
+    bubbleNote.textContent = notes.join(' ');
+    return moved;
+  }
+
+  /* ---------- bubble chrome (SVG, never exported) ---------- */
+
+  // One hit circle per live bubble, plus dashed keep-out outlines while a
+  // drag is in progress. Everything here is DOM, so it cannot reach
+  // toDataURL: the export needs no flag and the download handler needs no
+  // change at all.
+  // The guides are inert, so they are rebuilt freely. The hit circles are
+  // NOT: a circle is created once per bubble and then only has its
+  // attributes updated. Replacing it on every render would drop keyboard
+  // focus between two arrow presses and tear up the pointer capture holding
+  // a drag together -- both of which it did, until this was split.
+  const guideGroup = document.createElementNS(SVGNS, 'g');
+  const hitNodes = [null, null];
+
+  function makeHit(i) {
+    const c = document.createElementNS(SVGNS, 'circle');
+    c.setAttribute('r', String(BUBBLE_R));
+    c.setAttribute('tabindex', '0');
+    c.setAttribute('role', 'button');
+    c.setAttribute('aria-label',
+      `Bubble ${i + 1}. Drag to move, press Enter to adjust the photo inside, Delete to remove.`);
+    c.addEventListener('pointerdown', (e) => onBubbleDown(i, e));
+    c.addEventListener('pointermove', onBubbleMove);
+    c.addEventListener('pointerup', onBubbleUp);
+    c.addEventListener('pointercancel', onBubbleUp);
+    c.addEventListener('dblclick', (e) => { e.preventDefault(); setAdjust(true); render(); });
+    c.addEventListener('wheel', (e) => onBubbleWheel(i, e), { passive: false });
+    c.addEventListener('keydown', (e) => onBubbleKey(i, e));
+    c.addEventListener('dragover', (e) => {
+      e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+      c.classList.add('is-sel');
+    });
+    c.addEventListener('drop', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) loadBubbleFile(i, f);
+    });
+    return c;
+  }
+
+  function guideRect(r, cls) {
+    const g = document.createElementNS(SVGNS, 'rect');
+    g.setAttribute('class', cls);
+    g.setAttribute('x', String(r.x0));
+    g.setAttribute('y', String(r.y0));
+    g.setAttribute('width', String(r.x1 - r.x0));
+    g.setAttribute('height', String(r.y1 - r.y0));
+    g.setAttribute('rx', String(BUBBLE_CLEAR));
+    return g;
+  }
+
+  function syncBubbleLayer() {
+    if (guideGroup.parentNode !== bubbleLayer) bubbleLayer.appendChild(guideGroup);
+    guideGroup.textContent = '';
+    if (bubbleDrag) {
+      for (const r of bubbleDrag.keepout.text.concat([bubbleDrag.keepout.logo])) {
+        guideGroup.appendChild(guideRect({
+          x0: r.x0 - BUBBLE_CLEAR, y0: r.y0 - BUBBLE_CLEAR,
+          x1: r.x1 + BUBBLE_CLEAR, y1: r.y1 + BUBBLE_CLEAR,
+        }, 'bubble-guide'));
+      }
+      guideGroup.appendChild(guideRect({
+        x0: BUBBLE_EDGE, y0: BUBBLE_EDGE, x1: W - BUBBLE_EDGE, y1: H - BUBBLE_EDGE,
+      }, 'bubble-guide is-edge'));
+    }
+    bubbles.forEach((b, i) => {
+      if (!b) {
+        if (hitNodes[i]) { hitNodes[i].remove(); hitNodes[i] = null; }
+        return;
+      }
+      if (!hitNodes[i]) { hitNodes[i] = makeHit(i); bubbleLayer.appendChild(hitNodes[i]); }
+      const c = hitNodes[i];
+      let cls = 'bubble-hit';
+      if (selected === i) cls += adjusting ? ' is-adj' : ' is-sel';
+      if (bubbleDrag && bubbleDrag.i === i && bubbleDrag.blocked) cls += ' is-blocked';
+      if (c.getAttribute('class') !== cls) c.setAttribute('class', cls);
+      if (c.getAttribute('cx') !== String(b.cx)) c.setAttribute('cx', String(b.cx));
+      if (c.getAttribute('cy') !== String(b.cy)) c.setAttribute('cy', String(b.cy));
+    });
+  }
+
+  function select(i) {
+    if (selected !== i) { selected = i; adjusting = false; }
+    syncBubbleControls();
+  }
+
+  function setAdjust(on) {
+    adjusting = !!on && selected >= 0 && !!bubbles[selected];
+    syncBubbleLayer();
+    syncBubbleControls();
+  }
+
+  function onBubbleDown(i, e) {
+    if (picking) return;
+    const b = bubbles[i];
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const wasSelected = selected === i;
+    select(i);
+    const p = clientToCanvas(e.clientX, e.clientY);
+    bubbleDrag = {
+      i, x0: p.x, y0: p.y, cx0: b.cx, cy0: b.cy,
+      panX0: b.panX, panY0: b.panY, moved: false, blocked: false,
+      wasSelected,
+      pan: adjusting || e.shiftKey,
+      keepout: keepOut(lastLayout),
+    };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    render();
+  }
+
+  function onBubbleMove(e) {
+    if (!bubbleDrag) return;
+    const b = bubbles[bubbleDrag.i];
+    if (!b) return;
+    const p = clientToCanvas(e.clientX, e.clientY);
+    const dx = p.x - bubbleDrag.x0;
+    const dy = p.y - bubbleDrag.y0;
+    if (!bubbleDrag.moved && Math.hypot(dx, dy) < 3) return;
+    bubbleDrag.moved = true;
+    if (bubbleDrag.pan) {
+      panBy(b, bubbleBox(b), dx, dy, bubbleDrag.panX0, bubbleDrag.panY0);
+    } else {
+      const want = { cx: bubbleDrag.cx0 + dx, cy: bubbleDrag.cy0 + dy };
+      placeBubble(bubbleDrag.i, want.cx, want.cy, bubbleDrag.keepout);
+      bubbleDrag.blocked = Math.abs(b.cx - want.cx) > 0.5 || Math.abs(b.cy - want.cy) > 0.5;
+    }
+    render();
+  }
+
+  function onBubbleUp(e) {
+    if (!bubbleDrag) return;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    const d = bubbleDrag;
+    bubbleDrag = null;
+    // A click rather than a drag: the second click on an already selected
+    // bubble enters adjust mode, which is what makes this work on touch
+    // where dblclick is unreliable.
+    if (!d.moved && d.wasSelected) adjusting = !adjusting;
+    render();
+  }
+
+  function onBubbleWheel(i, e) {
+    // Only trapped in adjust mode: at 420px the page genuinely needs to
+    // scroll, and swallowing the wheel over a 150px target would be hostile.
+    if (!adjusting || selected !== i || !bubbles[i]) return;
+    e.preventDefault();
+    setBubbleZoom(i, bubbles[i].scaleMultiplier * (e.deltaY < 0 ? 1.06 : 1 / 1.06));
+  }
+
+  function onBubbleKey(i, e) {
+    const b = bubbles[i];
+    if (!b) return;
+    const step = e.shiftKey ? 10 : 1;
+    const nudge = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (nudge) {
+      e.preventDefault();
+      select(i);
+      if (adjusting) {
+        panBy(b, bubbleBox(b), nudge[0] * step, nudge[1] * step, b.panX, b.panY);
+      } else {
+        placeBubble(i, b.cx + nudge[0] * step, b.cy + nudge[1] * step);
+      }
+      render();
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault(); select(i); setAdjust(!adjusting); render(); return;
+    }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault(); removeBubble(i); return;
+    }
+    if (e.key === '+' || e.key === '=' || e.key === '-') {
+      e.preventDefault();
+      setBubbleZoom(i, b.scaleMultiplier + (e.key === '-' ? -0.05 : 0.05));
+    }
   }
 
   // Keeps the overlay's pixel grid locked to the canvas's displayed size.
@@ -1093,7 +1586,20 @@
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && picking) { e.preventDefault(); setPicking(false); }
+    if (e.key !== 'Escape') return;
+    // In order: cancel the dropper, then leave adjust mode, then deselect.
+    if (picking) { e.preventDefault(); setPicking(false); return; }
+    if (adjusting) { e.preventDefault(); setAdjust(false); render(); return; }
+    if (selected >= 0) { e.preventDefault(); select(-1); render(); }
+  });
+
+  // A click anywhere that is not a bubble or its controls drops the
+  // selection, so the chrome does not linger over a finished card.
+  document.addEventListener('pointerdown', (e) => {
+    if (selected < 0 || bubbleDrag) return;
+    if (e.target.closest && (e.target.closest('.bubble-hit') || e.target.closest('.bubble-group'))) return;
+    select(-1);
+    render();
   });
 
   /* ---------- upload ---------- */
@@ -1144,6 +1650,20 @@
     uploadRow.appendChild(slot);
   }
 
+  // Decoding is shared; what happens afterwards is not. The background's
+  // own reset (a picked colour means nothing in a new image) must not fire
+  // when a bubble is loaded.
+  function decodeImage(file) {
+    return new Promise((res, rej) => {
+      if (!file || !file.type || !file.type.startsWith('image/')) { rej(); return; }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(); };
+      img.src = url;
+    });
+  }
+
   function loadFile(file) {
     if (!file || !file.type.startsWith('image/')) return;
     const url = URL.createObjectURL(file);
@@ -1160,6 +1680,138 @@
     };
     img.onerror = () => URL.revokeObjectURL(url);
     img.src = url;
+  }
+
+  /* ---------- bubble images and controls ---------- */
+
+  function thumbOf(img) {
+    const c = document.createElement('canvas');
+    c.width = 60; c.height = 60;
+    const g = c.getContext('2d');
+    const s = Math.max(60 / img.width, 60 / img.height);
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(img, 30 - img.width * s / 2, 30 - img.height * s / 2,
+                img.width * s, img.height * s);
+    return c.toDataURL('image/jpeg', 0.8);
+  }
+
+  function setBubbleImage(i, img) {
+    const prev = bubbles[i];
+    // Replacing keeps the position -- it is the composition the user chose --
+    // but resets zoom and pan, because a pan computed for another image at
+    // another aspect ratio means nothing in this one.
+    const centre = prev ? { cx: prev.cx, cy: prev.cy } : null;
+    bubbles[i] = { img, scaleMultiplier: 1, panX: 0, panY: 0, thumb: thumbOf(img),
+                   cx: 0, cy: 0 };
+    const place = centre || defaultCentre(i, keepOut(lastLayout));
+    bubbles[i].cx = place.cx;
+    bubbles[i].cy = place.cy;
+    select(i);
+    adjusting = false;
+    buildBubbleControls();
+    render();
+  }
+
+  function loadBubbleFile(i, file) {
+    return decodeImage(file).then((img) => setBubbleImage(i, img), () => {});
+  }
+
+  function removeBubble(i) {
+    if (!bubbles[i]) return;
+    bubbles[i] = null;
+    if (selected === i) { selected = -1; adjusting = false; }
+    bubbleNote.textContent = '';
+    buildBubbleControls();
+    render();
+  }
+
+  function setBubbleZoom(i, z) {
+    const b = bubbles[i];
+    if (!b) return;
+    b.scaleMultiplier = clamp(z, 1, MAX_ZOOM);
+    syncBubbleControls();
+    render();
+  }
+
+  function buildBubbleControls() {
+    bubbleRow.textContent = '';
+    bubbles.forEach((b, i) => {
+      const slot = document.createElement('span');
+      slot.className = 'bubble-slot';
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'bubble-btn' + (b ? ' has-image' : '');
+      btn.id = `bubbleBtn${i}`;
+      btn.title = b ? `Replace the photo in bubble ${i + 1}` : `Add bubble ${i + 1}`;
+      btn.setAttribute('aria-label', btn.title);
+      if (b) btn.style.backgroundImage = `url(${b.thumb})`;
+      else btn.textContent = '+';
+
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.className = 'file-input';
+      input.id = `file-b${i}`;
+      input.addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f) loadBubbleFile(i, f);
+        e.target.value = '';
+      });
+      btn.addEventListener('click', () => input.click());
+      btn.addEventListener('dragover', (e) => {
+        e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+        btn.classList.add('drag-over');
+      });
+      btn.addEventListener('dragleave', () => btn.classList.remove('drag-over'));
+      btn.addEventListener('drop', (e) => {
+        e.preventDefault(); btn.classList.remove('drag-over');
+        loadBubbleFile(i, e.dataTransfer.files && e.dataTransfer.files[0]);
+      });
+
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'bubble-remove';
+      rm.id = `bubbleRemove${i}`;
+      rm.textContent = '×';
+      rm.title = `Remove bubble ${i + 1}`;
+      rm.setAttribute('aria-label', rm.title);
+      rm.hidden = !b;
+      rm.addEventListener('click', () => removeBubble(i));
+
+      slot.appendChild(btn); slot.appendChild(input); slot.appendChild(rm);
+      bubbleRow.appendChild(slot);
+    });
+
+    const zoomWrap = document.createElement('span');
+    zoomWrap.className = 'bubble-zoom';
+    const zl = document.createElement('label');
+    zl.textContent = 'Zoom';
+    zl.htmlFor = 'bubbleZoom';
+    const zoom = document.createElement('input');
+    zoom.type = 'range'; zoom.id = 'bubbleZoom';
+    zoom.min = '1'; zoom.max = String(MAX_ZOOM); zoom.step = '0.01';
+    zoom.addEventListener('input', (e) => {
+      if (selected >= 0) setBubbleZoom(selected, parseFloat(e.target.value));
+    });
+    zoomWrap.appendChild(zl); zoomWrap.appendChild(zoom);
+    bubbleRow.appendChild(zoomWrap);
+    syncBubbleControls();
+  }
+
+  // The one slider follows the selection, so two bubbles keep independent
+  // zoom without a second slider wrapping the control bar to a third row.
+  function syncBubbleControls() {
+    const zoom = document.getElementById('bubbleZoom');
+    if (!zoom) return;
+    const b = selected >= 0 ? bubbles[selected] : null;
+    zoom.disabled = !b;
+    zoom.value = String(b ? b.scaleMultiplier : 1);
+    zoom.title = b ? `Zoom bubble ${selected + 1}` : 'Select a bubble to zoom its photo';
+    bubbles.forEach((x, i) => {
+      const btn = document.getElementById(`bubbleBtn${i}`);
+      if (btn) btn.classList.toggle('is-sel', selected === i && !!x);
+    });
   }
 
   /* ---------- controls ---------- */
@@ -1348,7 +2000,41 @@
     setTypeset: (on) => { typeset = !!on; typesetToggle.checked = !!on; render(); },
     typeset: () => typeset,
     polishLines, blockText, lineFault, isolatedCount, raggedness, endsPhrase, TYPESET,
-    geom: { W, H, BOX_W, BOX_LEFT, SAFE_TOP, TOP_LIMIT, CENTRE_X },
+    geom: { W, H, BOX_W, BOX_LEFT, SAFE_TOP, TOP_LIMIT, CENTRE_X,
+            BUBBLE_D, BUBBLE_R, BUBBLE_RING, BUBBLE_EDGE, BUBBLE_CLEAR, BUBBLE_GAP },
+    // Bubbles. addBubble resolves after decode and render, because a file
+    // dialog cannot be driven headlessly.
+    bubbles: () => bubbles.map((b, i) => (b ? {
+      i, cx: b.cx, cy: b.cy, r: BUBBLE_R, zoom: b.scaleMultiplier,
+      panX: b.panX, panY: b.panY, w: b.img.naturalWidth, h: b.img.naturalHeight,
+    } : null)),
+    addBubble: (i, src) => new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => { setBubbleImage(i, img); res(); };
+      img.onerror = rej;
+      img.src = src;
+    }),
+    removeBubble,
+    moveBubble: (i, cx, cy) => {
+      placeBubble(i, cx, cy, keepOut(lastLayout));
+      render();
+      return bubbles[i] ? { cx: bubbles[i].cx, cy: bubbles[i].cy } : null;
+    },
+    setBubbleZoom,
+    setBubblePan: (i, px, py) => {
+      if (!bubbles[i]) return null;
+      bubbles[i].panX = px; bubbles[i].panY = py; render();
+      return { panX: bubbles[i].panX, panY: bubbles[i].panY };
+    },
+    selectBubble: (i) => { select(i); render(); },
+    setAdjust: (on) => { setAdjust(on); render(); },
+    selection: () => ({ selected, adjusting }),
+    textBoxes: () => textBoxes(chooseLayout()),
+    logoRect,
+    bubbleLegal: (i, cx, cy) => bubbleLegal(i, cx, cy, keepOut(chooseLayout())),
+    bubbleNote: () => bubbleNote.textContent,
+    bgPan: () => (photo ? { panX: photo.panX, panY: photo.panY, zoom: photo.scaleMultiplier } : null),
+    exportURL: () => canvas.toDataURL('image/jpeg', 0.92),
     defaults: { ...DEFAULT_HEAD },
     caps: () => ({ ...CAP }),
     baseSpace, wordAdvance, wordSpacingPx, measureLine,
@@ -1363,5 +2049,6 @@
   window.addEventListener('resize', syncScale);
 
   buildUploadSlot();
+  buildBubbleControls();
   render();
 })();

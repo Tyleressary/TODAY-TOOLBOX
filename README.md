@@ -392,6 +392,69 @@ edit the copy, export a 1200×1500 JPG.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
 
+  **Image bubbles.** Up to two circular photo bubbles can be dropped on the
+  card. The geometry is measured off the supplied reference, not estimated:
+  outer diameter **433px**, a **5.5px** pure white ring and so a **422px**
+  photo aperture, with no shadow — a circle fit to the reference's ring gave
+  a radius SD of 0.67px, and the rendered card reproduces 433.0 / 421.1 / 5.9
+  by the same 50%-luminance method.
+
+  A bubble is the same four-field record as the background photo
+  (`img`, `scaleMultiplier`, `panX`, `panY`) plus a centre, so
+  `panelImageMetrics` and `drawPanelImage` drive it unchanged — cover fit,
+  zoom, and pan clamped so no edge can be revealed. The image is cover-fitted
+  to the **outer** square rather than the aperture, so it covers every pixel
+  the clip can expose and nothing bleeds through the ring's inner edge. The
+  decoded image is kept at natural size for its whole life, so twenty zoom
+  steps and one zoom step to the same value export byte for byte.
+
+  Bubbles draw above the background and the gradient and **below all type and
+  the lockup**, so neither can be covered by construction rather than by
+  guard arithmetic. With no bubble added the draw call is two null checks, and
+  the default export hash is unchanged.
+
+  **Guard rails.** Four, all hard. The card edges hold the centre inside
+  316.5–883.5 × 316.5–1183.5, using the text box's own 100px inset rather than
+  a new margin. The lockup and every line of type need 40px of clearance; the
+  two bubbles stay 449px apart, centre to centre. 40px is measured, not
+  guessed: a bubble over the lockup's x-range bottoms out at
+  `1417 − 40 − 216.5 = 1160.5`, which is exactly the reference's own
+  left-bubble centre, and the design's dek-to-logo air (~74.5px ink to top)
+  corroborates the range from the other side. A blocked bubble is pushed
+  straight back out of whatever it touches by the shortest distance, so it
+  hugs the boundary instead of sticking, and the restricted zones show as
+  dashed outlines while dragging.
+
+  The text guard works from `textBoxes()`, which derives a rect per line from
+  the same `measureLine` and `metrics` the renderer uses — so a short line
+  really does leave room beside it. Vertical extents come from the style's
+  ascent and descent rather than the line's own ink, or the boundary would
+  jump 20px whenever a line happened to be all lowercase. Text always wins:
+  when copy grows into a placed bubble the bubble slides to the nearest legal
+  centre and says so. Nothing in `layout()` reads the bubbles, so a bubble can
+  never move a baseline, a line break or the chosen size — asserted by
+  comparing the whole layout object with zero, one and two bubbles.
+
+  **Chrome is an SVG over the canvas, not canvas drawing.** Selection rings
+  and keep-out guides therefore cannot reach `toDataURL` — no export flag and
+  no change to the download handler — and a hit circle sits above the editable
+  layer, so a click on a bubble is never swallowed by the contenteditable
+  while the existing eyedropper and background-pan handlers keep working
+  untouched. The hit circles are created once per bubble and only have their
+  attributes updated: rebuilding them each render dropped keyboard focus
+  between two arrow presses and tore up the pointer capture holding a drag
+  together.
+
+  Drag a bubble to move it; click a selected bubble, or double-click, to enter
+  adjust mode, where dragging pans the photo inside the fixed frame and the
+  wheel zooms. Shift+drag pans without entering the mode. The wheel is only
+  trapped in adjust mode, because at 420px the page genuinely needs to scroll.
+  Arrows nudge 1px and 10px, Enter toggles adjust, Delete removes, Escape
+  steps back out. Two consequences worth knowing: the dropper samples the
+  background photo only, so clicking "on" a bubble picks what is behind it
+  (correct — the gradient is a property of the background), and type sitting
+  under a bubble cannot be clicked to edit, though Tab still reaches it.
+
 ## Punctuation and typography
 
 Straight quotation marks, double hyphens and three-period ellipses must never

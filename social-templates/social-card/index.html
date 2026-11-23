@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Bodoni:ital,wght@0,400..700;1,400..700&family=Source+Sans+3:wght@400;600;700;900&display=swap">
 <link rel="stylesheet" href="../../assets/toolbox.css?v=12">
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
   <header class="page-shell">
@@ -93,6 +93,10 @@
             <label><input type="checkbox" id="dekToggle" checked> Dek</label>
           </div>
         </div>
+        <div class="control-group bubble-group">
+          <span class="control-label" id="bubbleLabel">Bubbles</span>
+          <div class="bubble-row" id="bubbleRow" role="group" aria-labelledby="bubbleLabel"></div>
+        </div>
       </div>
     </section>
 
@@ -107,6 +111,14 @@
           <div class="edit-text" id="edDek" contenteditable="plaintext-only"
                role="textbox" aria-label="Dek" data-placeholder="Dek">The dek goes here when needed and it’s in Source Sans 3 Medium, 50pt</div>
         </div>
+        <!-- Bubble chrome and hit targets. Deliberately an SVG over the canvas
+             rather than canvas drawing: selection rings and guides can then
+             never reach toDataURL, and a circle here hit-tests above the
+             editable layer, so a click on a bubble is not swallowed by the
+             text. The viewBox matches the card, so geometry is written in
+             canvas pixels and scales itself. -->
+        <svg class="bubble-layer" id="bubbleLayer" viewBox="0 0 1200 1500"
+             preserveAspectRatio="xMidYMid meet" role="group" aria-label="Image bubbles"></svg>
         <div class="loupe" id="loupe" hidden aria-hidden="true">
           <canvas id="loupeCanvas" width="90" height="90"></canvas>
           <span class="loupe-hex" id="loupeHex"></span>
@@ -116,6 +128,7 @@
 
     <p class="edit-hint">Click any text on the card to edit it.</p>
     <p class="size-note" id="sizeNote"></p>
+    <p class="size-note" id="bubbleNote"></p>
 
     <section class="export-panel" aria-label="Export">
       <label for="filename">File name</label>
@@ -136,6 +149,6 @@
   </footer>
 
   <script src="../../assets/smart-punctuation.js?v=19"></script>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

@@ -416,3 +416,105 @@
 /* The canvas uppercases the eyebrow, so the overlay must too, or the two
    measure different glyphs and the caret drifts from the text. */
 #edEyebrow { text-transform: uppercase; }
+
+/* ---------- image bubbles ---------- */
+
+/* Chrome and hit targets live here rather than on the canvas, so a selection
+   ring can never reach toDataURL and a bubble hit-tests above the editable
+   layer. The viewBox is the card, so geometry is written in canvas pixels. */
+.bubble-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* Same trap as the edit layer: a child that re-enables pointer-events stays
+   hit-testable however the parent is set, so both have to stand down while
+   the dropper is armed. */
+.card-stage.is-picking .bubble-layer,
+.card-stage.is-picking .bubble-hit { pointer-events: none; }
+
+.bubble-hit {
+  fill: transparent;
+  pointer-events: all;
+  cursor: move;
+  outline: none;
+  stroke: transparent;
+  stroke-width: 4;
+}
+
+.bubble-hit:hover { stroke: rgba(255, 255, 255, 0.55); }
+.bubble-hit.is-sel { stroke: rgba(255, 255, 255, 0.95); }
+
+/* Adjust mode: the dashes say the photo moves, not the frame. */
+.bubble-hit.is-adj {
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-dasharray: 16 12;
+  cursor: grab;
+}
+
+.bubble-hit.is-blocked { stroke: var(--red-500); stroke-width: 6; }
+.bubble-hit:focus-visible { stroke: var(--purple-500); stroke-width: 6; }
+
+.bubble-guide {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 3;
+  stroke-dasharray: 12 9;
+}
+
+.bubble-guide.is-edge { stroke: rgba(255, 255, 255, 0.35); }
+
+/* The control group. Sized to sit inside the second bar's headroom: the row
+   must not wrap, or the page stops fitting one screen. */
+.bubble-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bubble-slot { display: inline-flex; align-items: center; gap: 2px; }
+
+/* The picker is opened by the thumbnail button, so the input itself is not
+   shown -- unlike the background's upload slot, where it is the control. */
+.bubble-slot .file-input { display: none; }
+
+.bubble-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px dashed var(--gray-400);
+  background: #ffffff center / cover no-repeat;
+  color: var(--gray-600);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.bubble-btn.has-image { border-style: solid; border-color: #ffffff; box-shadow: 0 0 0 1px var(--gray-400); }
+.bubble-btn.is-sel { box-shadow: 0 0 0 2px var(--purple-500); }
+.bubble-btn.drag-over { border-color: var(--purple-500); }
+.bubble-btn:hover { border-color: var(--purple-500); }
+
+.bubble-remove {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--gray-200);
+  color: var(--gray-600);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.bubble-remove:hover { background: var(--red-500); color: #ffffff; }
+
+.bubble-zoom { display: inline-flex; align-items: center; gap: 6px; }
+.bubble-zoom label { font-size: var(--text-xs); color: var(--gray-600); }
+.bubble-zoom input[type="range"] { width: 86px; }
