@@ -47,9 +47,13 @@
   const BUBBLE_EDGE = SAFE_TOP;
   const BUBBLE_CLEAR = 40;
 
-  // Text composition. 'original' reproduces the existing design exactly:
-  // horizontally centred, vertically bottom-anchored to the logo.
-  const align = { h: 'original', v: 'original' };
+  // Text composition. The original design is horizontally centred and
+  // vertically bottom-anchored to the logo, so the horizontal default IS
+  // 'center' -- there is no third horizontal state to have. ('original' is
+  // still accepted here and renders identically, because the test suite and
+  // any saved link may still name it.) Vertically 'original' is the real
+  // bottom-anchored composition and is its own state.
+  const align = { h: 'center', v: 'original' };
   // Automatic editorial line breaking; off reverts to plain greedy wrapping.
   let typeset = true;
   function alignLeft() { return align.h === 'left'; }
