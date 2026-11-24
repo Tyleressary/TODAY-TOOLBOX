@@ -244,7 +244,7 @@ edit the copy, export a 1200×1500 JPG.
   minutes, still climbing, to 6.9s end to end — about 17ms a keystroke. Every
   headline that genuinely gets typeset is far below the ceiling: the heaviest
   real case measured is 133 nodes against a budget of 20,000, so no current
-  output changes, and the default export hash is unmoved.
+  output changes, and the default card's pixels are unmoved.
 
   Because the line count is fixed to greedy's and the pass runs after the size
   sweep, it **cannot** move the font, size, tracking, word spacing, kerning,
@@ -315,10 +315,10 @@ edit the copy, export a 1200×1500 JPG.
 
   `placeEditable()` also writes a style property only when its value actually
   changed, so the active element's geometry is not churned on every keystroke.
-- **Text layout: two independent settings.** **Align** (Original / Left /
-  Centre) and **Place** (Original / Top / Centre), freely combinable.
-  Original/Original reproduces the existing design exactly — the default-state
-  export is byte-identical to before the feature existed.
+- **Text layout: two independent settings.** **Align** (Left / Center) and
+  **Place** (Bottom / Top / Center), freely combinable. Center/Bottom — the
+  default, and what the buttons used to call Original — reproduces the
+  existing design exactly, pixel for pixel with before the feature existed.
 
   Both reference the inset the text box already sits in, `(1200 − 1000) / 2 =
   100px`, as the left edge and as the top safe margin; no new margin is
@@ -408,10 +408,48 @@ More tools will be added to the toolbox over time, linked from the home page (`/
   decoded image is kept at natural size for its whole life, so twenty zoom
   steps and one zoom step to the same value export byte for byte.
 
+  **The ring is a disc under the photo, not a stroke over it.** It began as
+  the obvious construction: clip the photo at the outer radius, stroke 5.5px
+  of white over its last few pixels. That composites the boundary pixel
+  twice. The clip leaves it part photo and part background, then the stroke's
+  own antialiasing lays only partial white on top, so a fraction of the photo
+  survives *outside* the white — and where the photo is dark it reads as a
+  grey halo. Measured on a near-black photo against the flat light blue
+  background: 359 pixels in the annulus below the background level, the worst
+  **61 levels** down on one bubble and **76** on the other, and the ring
+  itself eaten back to **4.54px** of its 5.5. Filling a solid white disc at
+  216.5 first and clipping the photo to the 211px aperture means the only
+  thing that ever meets the background is white. The fringe goes to zero
+  pixels, the ring measures **5.43px** against the reference's own 5.79, and
+  the photo inside the aperture is byte for byte what it was — the fix is at
+  the edge and nowhere else.
+
+  **Downscaling is one pass, deliberately.** A progressive halving pre-pass is
+  the usual advice for large reductions, and measured here it is the wrong
+  advice: against a sine chirp at the bubble's own 3.7:1 ratio it loses
+  contrast *below* Nyquist, where the real detail is — 0.93 → 0.89 at a 6.5px
+  output period, 0.84 → 0.73 at 3.25px. The browser's own resampler, given
+  the decoded original in a single `drawImage`, keeps more. `imageSmoothing`
+  stays `high`, and it is set inside the bubble's `save()` so the background
+  photo's resampling is untouched.
+
+  **Export quality is 1, for colour rather than for bytes.** Chrome's canvas
+  JPEG encoder subsamples colour 4:2:0 at every quality below 1 — readable in
+  the file's own SOF sampling factors, `2x2 1x1 1x1` up to 0.99 and
+  `1x1 1x1 1x1` at 1 — so chroma detail is capped however high the quality
+  goes. Measured against the canvas the export is made from: chroma error
+  35.6 dB at 0.92, still 36.3 dB at 0.99, then 54.6 dB at 1. Inside a bubble
+  the whole error goes **31.9 → 50.3 dB**, which is the difference between a
+  photograph that has been through a visible lossy pass and one that has not,
+  and it shows most where colour carries the detail — skin, lips, eyes. The
+  cost is about 4.5x the file: 112 KB → 522 KB for a card with no photo,
+  180 → 812 KB with one bubble, 545 KB → 2.3 MB for a background photo and
+  two bubbles.
+
   Bubbles draw above the background and the gradient and **below all type and
   the lockup**, so neither can be covered by construction rather than by
   guard arithmetic. With no bubble added the draw call is two null checks, and
-  the default export hash is unchanged.
+  the default card's pixels are unchanged.
 
   **Guard rails.** Four, all hard. The card edges hold the centre inside
   276.5–923.5 × 276.5–1223.5, a 60px inset. The lockup and every line of

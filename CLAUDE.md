@@ -137,6 +137,23 @@ so the whole team gets them, rather than in one person's browser.
   placed both above and below centred text. At 75 or 100 there is nowhere legal
   to put one and the bubble appears frozen. Do not raise it without re-running
   the free-space count.
-- The Social Card's default-state export hash is a regression invariant:
-  `643e123d7a860c45`. Changes that are meant to preserve the existing
-  design must leave it byte-identical.
+- The Social Card's default state is a regression invariant, at two levels.
+  The canvas pixels hash `a14fcf56d18e9ea3`; that is the design itself and
+  must not move. The exported file hashes `dadee5dc637029f2`. The older
+  number `643e123d7a860c45` is the same pixels encoded at the old JPEG
+  quality of 0.92, which is why `card-hash.js` still prints it: it is a
+  pixel probe, not an export probe. Changes that are meant to preserve the
+  existing design must leave all of these byte-identical.
+- The Social Card exports at JPEG quality 1, and that is not a round-number
+  flourish. Chrome's canvas encoder subsamples colour 4:2:0 at every quality
+  below 1 and writes 4:4:4 only at 1, so colour detail is capped however high
+  the quality goes: chroma error measured against the canvas is 35.6 dB at
+  0.92 and still 36.3 dB at 0.99, then 54.6 dB at 1. Lowering it to save
+  bytes reintroduces the softness it was raised to remove.
+- Bubble rings are a white disc drawn UNDER the photo, with the photo clipped
+  to the aperture — never a stroke over a photo clipped to the outer radius.
+  Stroking composites the boundary pixel twice and leaves a grey halo around
+  the circle, measured at 61–76 levels below the background on a dark photo.
+  The photo is also drawn in one pass from the decoded original: a step-down
+  pre-pass sounds like a sharpening measure and is the opposite, costing
+  contrast below Nyquist (0.93 → 0.89 at a 6.5px period).
