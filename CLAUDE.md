@@ -132,6 +132,11 @@ so the whole team gets them, rather than in one person's browser.
 - Local assets carry a `?v=N` cache-busting query. Bump the version on a
   page when its own scripts or styles change.
 - `editorial-templates/calendar/calendar.css` is not edited.
+- The Social Card's bubble edge inset is 60px, and that number is load-bearing
+  rather than cosmetic: it is the largest inset at which a 433px bubble can be
+  placed both above and below centred text. At 75 or 100 there is nowhere legal
+  to put one and the bubble appears frozen. Do not raise it without re-running
+  the free-space count.
 - The Social Card's default-state export hash is a regression invariant:
   `643e123d7a860c45`. Changes that are meant to preserve the existing
   design must leave it byte-identical.

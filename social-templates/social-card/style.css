@@ -429,6 +429,10 @@
   height: 100%;
   pointer-events: none;
   overflow: visible;
+  /* Above the editable layer and above the proofreader's marks, by
+     declaration rather than by DOM order, so a bubble stays grabbable
+     whatever else the page appends to the stage later. The loupe is 3. */
+  z-index: 2;
 }
 
 /* Same trap as the edit layer: a child that re-enables pointer-events stays

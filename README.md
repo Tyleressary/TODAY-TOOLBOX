@@ -414,16 +414,31 @@ More tools will be added to the toolbox over time, linked from the home page (`/
   the default export hash is unchanged.
 
   **Guard rails.** Four, all hard. The card edges hold the centre inside
-  316.5–883.5 × 316.5–1183.5, using the text box's own 100px inset rather than
-  a new margin. The lockup and every line of type need 40px of clearance; the
-  two bubbles stay 449px apart, centre to centre. 40px is measured, not
-  guessed: a bubble over the lockup's x-range bottoms out at
-  `1417 − 40 − 216.5 = 1160.5`, which is exactly the reference's own
+  276.5–923.5 × 276.5–1223.5, a 60px inset. The lockup and every line of
+  type need 40px of clearance; the two bubbles stay 449px apart, centre to
+  centre. 40px is measured, not guessed: a bubble over the lockup's x-range
+  bottoms out at `1417 − 40 − 216.5 = 1160.5`, which is exactly the reference's own
   left-bubble centre, and the design's dek-to-logo air (~74.5px ink to top)
   corroborates the range from the other side. A blocked bubble is pushed
   straight back out of whatever it touches by the shortest distance, so it
   hugs the boundary instead of sticking, and the restricted zones show as
   dashed outlines while dragging.
+
+  **Why the inset is 60 and not 100.** It began as the text column's own 100px,
+  which is where the reference's left bubble sits — but the two are different
+  ideas, and with centred text they conflict. A bubble needs its 433px plus
+  40px of clearance either side, and centred copy splits the card into bands
+  that are just too short. Counting legal centres on an 8px grid over a default
+  centred card: **at 100 there are none at all**, so the bubble cannot move and
+  reads as stuck behind the type; at 80 there are 3 and at 75 there are 4, all
+  in a sliver below. 60 is the largest inset that opens room on both sides —
+  18 above and 15 below — and it still keeps the whole ring 60px clear of every
+  edge. A test pins the both-sides count so the number cannot drift back up.
+
+  Crossing the type was never a drag-model problem: `onBubbleMove` hands
+  `placeBubble` the pointer's absolute position rather than an increment, so a
+  bubble jumps to the far side the moment a legal centre exists there. It had
+  nowhere to land, not no way to travel.
 
   The text guard works from `textBoxes()`, which derives a rect per line from
   the same `measureLine` and `metrics` the renderer uses — so a short line

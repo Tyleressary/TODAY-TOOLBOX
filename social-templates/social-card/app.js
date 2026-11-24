@@ -37,14 +37,25 @@
   // above it, so there the limit is the top safe margin instead.
   const TOP_LIMIT = H / 2;
 
-  // Bubble guard rails. The edge inset is the text box's own, so no new
-  // margin is invented -- and it is exactly where the reference's left bubble
-  // sits. The clearance is measured too: a bubble over the lockup's x-range
-  // bottoms out at 1417 - 40 - 216.5 = 1160.5, which is precisely the
-  // reference's left-bubble centre. The design's own dek-to-logo air
-  // (GAP_DEK_LOGO 85.5 baseline to top, ~74.5 ink to top) corroborates the
-  // range from the other side.
-  const BUBBLE_EDGE = SAFE_TOP;
+  // Bubble guard rails.
+  //
+  // The edge inset is NOT the text box's 100px any more, and deliberately so:
+  // that is the text column's inset, while this is "how much room does a
+  // 433px disc need to be placeable". With the text centred the two are in
+  // conflict. A bubble needs 433 of diameter plus 40 of clearance either
+  // side, and centred copy splits the 1500px card into bands that are just
+  // too short. Counting legal centres on an 8px grid over a default centred
+  // card: at a 100px inset there are ZERO -- the bubble cannot move at all,
+  // which reads as it being stuck behind the type. At 80 there are 3 and at
+  // 75 there are 4, all in a sliver below. 60 is the largest inset that
+  // opens room both above and below (33), and it still keeps the whole ring
+  // 60px clear of every edge, so nothing is ever clipped.
+  const BUBBLE_EDGE = 60;
+  // Air between the ring and any ink -- type or lockup. Measured, and
+  // unchanged: a bubble over the lockup's x-range bottoms out at
+  // 1417 - 40 - 216.5 = 1160.5, precisely the reference's left-bubble
+  // centre, and the design's own dek-to-logo air (GAP_DEK_LOGO 85.5 baseline
+  // to top, ~74.5 ink to top) corroborates it from the other side.
   const BUBBLE_CLEAR = 40;
 
   // Text composition. The original design is horizontally centred and

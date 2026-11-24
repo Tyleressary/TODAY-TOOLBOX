@@ -7,6 +7,11 @@
   inset: 0;
   pointer-events: none;
   overflow: hidden;
+  /* Decoration ranks below interactive chrome. Without this the order is
+     whatever the DOM happens to be, and because the proofreader appends its
+     layer after the Social Card's bubble layer, a 4px mark -- which does take
+     pointer events -- would sit above a bubble's hit circle. */
+  z-index: 1;
 }
 
 /* The squiggle is a repeating wave drawn under the word. Word's convention:
