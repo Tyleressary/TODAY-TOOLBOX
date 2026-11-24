@@ -60,6 +60,9 @@
       // Keep the name field in step when the headline is typed on the calendar.
       if (document.activeElement !== nameInput) nameInput.value = current.headline;
       filenameInput.placeholder = defaultFilename();
+      // Every edit re-fits the boxes, which moves the glyphs the marks sit
+      // under; one frame later the layout has settled.
+      if (window.proofreadUI) requestAnimationFrame(() => window.proofreadUI.repaintAll());
       save();
     },
   });
@@ -84,6 +87,39 @@
   // live DOM, so converted characters flow through unchanged.
   const smartText = (t) => (typeof window.smartPunctuation === 'function')
     ? window.smartPunctuation(t) : t;
+  /* ---------- proofreading ---------- */
+
+  // The marks go in .tcal-frame, OUTSIDE the .tcal artboard. The export
+  // clones the artboard into a foreignObject and rasterises it, so anything
+  // drawn inside it would land in the JPG; as a sibling, the layer cannot.
+  function wireProofreading() {
+    if (!window.proofreadUI || !window.proofreader) return;
+    const frame = calendar.frame;
+    frame.style.position = frame.style.position || 'relative';
+    const add = (node, register, name) => {
+      if (!node) return;
+      window.proofreadUI.attach(window.proofreadUI.editableAdapter(node, {
+        name, register, host: frame,
+      }));
+    };
+    // Everything on the calendar is display copy: a day box holds "Walk the
+    // dog", not a sentence.
+    add(calendar.fields.headline, 'display', 'headline');
+    add(calendar.fields.eyebrowSuffix, 'display', 'eyebrow');
+    calendar.cells.forEach((c, i) => add(c.text, 'display', 'day ' + (i + 1)));
+    calendar.weekCells.forEach((c, i) => add(c.text, 'display', 'week ' + (i + 1)));
+
+    for (const [input, name] of [[nameInput, 'headline field'], [dayLabelInput, 'day label'],
+                                 [fillInput, 'fill text']]) {
+      const group = input.closest('.field') || input.parentNode;
+      group.style.position = group.style.position || 'relative';
+      window.proofreadUI.attach(window.proofreadUI.inputAdapter(input, {
+        name, register: 'display', host: group,
+      }));
+    }
+    window.proofreadUI.setNote($('proofNote'));
+  }
+
   function wireSmartPunctuation(input, apply) {
     const tidy = () => {
       const t = smartText(input.value);
@@ -315,4 +351,5 @@
   }
 
   syncControls();
+  wireProofreading();
 })();

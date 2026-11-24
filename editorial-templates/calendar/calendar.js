@@ -239,7 +239,9 @@
       editable.forEach((node) => {
         if (this.editing) {
           node.setAttribute('contenteditable', mode);
-          node.setAttribute('spellcheck', 'true');
+          // The toolbox's own proofreader owns the underlines here; two
+          // squiggle systems at once would be unreadable.
+          node.setAttribute('spellcheck', 'false');
         } else {
           node.removeAttribute('contenteditable');
           node.removeAttribute('spellcheck');

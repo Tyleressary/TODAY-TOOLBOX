@@ -93,6 +93,38 @@ drift.
   because a spaced hyphen between words is exactly the incorrect form the
   standard names.
 
+## Proofreading
+
+`assets/proofreader.js` checks spelling, grammar and punctuation;
+`assets/proofread-ui.js` draws the marks and the popup. Every tool that takes
+copy loads both, and the dictionary under `assets/dictionary/` is fetched on
+the first focus of a text field, never at page load.
+
+The engine is **cautious on purpose**. These are display graphics: headlines
+are fragments by design, eyebrows are shouted in caps and the copy is
+conversational, so a checker that nags at correct editorial writing is worse
+than none. Each field declares a register — `display` or `prose` — and the
+sentence-level rules run only on prose.
+
+Three standing rules for anyone extending it:
+
+- **Never flag what another part of the toolbox fixes by itself.** Straight
+  quotes, `...` and `--` are converted automatically on paste and on blur, so
+  the proofreader leaves them alone.
+- **Never widen a rule that cannot be made precise.** Sentence fragments,
+  general run-on and missing-comma detection and "awkward phrasing" are left
+  out rather than faked — none can be done without a parser, and a regex
+  imitation flags good copy. A new rule ships with a true positive *and* a
+  near-miss it must not flag, both in the test corpus.
+- **Never rewrite the writer's words without a click.** The engine only ever
+  returns issues; the only code that writes to a field is the Accept button.
+
+Known decisions, so they are not mistaken for bugs: British spellings are
+flagged with the US form first, because this is a US newsroom; the dictionary
+is SCOWL's, whose licence is committed beside it and requires attribution; and
+names the general dictionary lacks belong in `assets/dictionary/today-terms.txt`
+so the whole team gets them, rather than in one person's browser.
+
 ## Repository conventions
 
 - Plain static HTML, CSS and JS. No build step, no bundler, no framework.

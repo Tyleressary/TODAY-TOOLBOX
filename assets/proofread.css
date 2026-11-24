@@ -222,3 +222,10 @@
 }
 
 #proofNote:empty { display: none; }
+
+/* One layer per host, one child per field inside it. */
+.pr-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}

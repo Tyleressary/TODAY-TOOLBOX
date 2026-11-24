@@ -455,6 +455,70 @@ More tools will be added to the toolbox over time, linked from the home page (`/
   (correct — the gradient is a property of the background), and type sitting
   under a bubble cannot be clicked to edit, though Tab still reaches it.
 
+## Proofreading
+
+A Word-style checker built into every tool that takes copy: red squiggles for
+spelling, blue for grammar, purple for punctuation, a popup with the
+explanation and a one-click fix, and a counter that collapses to nothing when
+the copy is clean. `assets/proofreader.js` is the engine (pure, no DOM),
+`assets/proofread-ui.js` the interface, `assets/proofread.css` the marks.
+
+**The dictionary** is SCOWL's hunspell `en`, 49,568 stems expanded through 59
+suffix and 14 prefix rule groups into **123,778 inflected forms**. It is
+front-coded — each line gives the number of characters it shares with the line
+before — which takes it from 1.19MB to 582KB on disk and **195KB over the
+wire**, with a six-line decoder. It is fetched on the first focus of a text
+field, so a page nobody types on downloads nothing, and if the fetch fails
+spelling stands down while the grammar and punctuation rules, which need no
+dictionary, carry on. SCOWL's licence is committed beside the data as it
+requires. `assets/dictionary/today-terms.txt` carries the names the general
+dictionary lacks and ships to the whole team; "Add to dictionary" saves to the
+browser on top of it.
+
+**Suggestions** are ranked by frequency first, then by the cost of the slip:
+leaving a letter out is much the commonest mistake, so restoring one outranks
+changing one. That ordering is what makes `wich` give `which` before `with`.
+The affix file's REP table of phonetic confusions is priced as a cheaper
+substitution rather than an override — as a flat discount it put `wish` first
+instead. Candidates are generated only when a popup opens, never while typing;
+the typing pass is a set lookup per word and runs in 0.10ms on a 400-character
+headline.
+
+**Registers.** Headlines and eyebrows are deliberate fragments, so the
+sentence-level rules (terminal punctuation, sentence capitals, comma splices)
+run only on prose fields — in practice the Social Card's dek. Everything else
+is display copy.
+
+**Left out on purpose**, rather than faked: sentence fragments (they are the
+product here), general run-on and missing-comma detection, general
+subject–verb agreement beyond closed-class pronouns, and "awkward phrasing".
+None can be made precise without a parser. Straight quotes, `...` and `--` are
+not flagged either, because the punctuation converter fixes them a moment
+later — flagging them would be nagging about the toolbox's own pending work.
+
+**Three false positives found by testing against real copy**, each of which
+would have made the tool worse than nothing. Every contraction in finished
+copy was flagged, because the toolbox writes curly apostrophes and the
+dictionary stores straight ones; the two are now folded together before
+lookup. Conversational clipped forms — `goin’`, `talkin’`, `y’all`, `ok` —
+were flagged, so a word ending in "in" whose "-ing" form is known is now
+accepted, while nonsense still is not. And an accepted fix inherited the wrong
+case, turning "Their is" into "there is".
+
+**Marks never touch the edited text.** They are drawn from `Range` rects into
+a separate layer, so they cannot move a caret or a selection, and they cannot
+reach an export: on the Social Card the layer is DOM rather than canvas, and
+on the Calendar it is a sibling of the artboard, outside the subtree the
+export clones into its `foreignObject`. Accepting a correction changes the
+text's length, which the Social Card's typing path forbids, so it commits the
+way the blur tidy-up does — write the block, put the caret after the
+replacement, repaint.
+
+The browser's own spellcheck is switched off wherever the checker runs. On the
+Social Card it was painting squiggles under text that is transparent, with the
+real glyphs on the canvas carrying none; the Calendar was forcing it on for all
+72 of its editable nodes.
+
 ## Punctuation and typography
 
 Straight quotation marks, double hyphens and three-period ellipses must never

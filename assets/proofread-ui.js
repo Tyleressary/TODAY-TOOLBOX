@@ -48,8 +48,14 @@
     };
     fields.push(f);
 
-    f.layer = el('div', 'pr-layer');
-    adapter.host.appendChild(f.layer);
+    // Fields that share a host share one layer: the calendar has 75 editable
+    // nodes over a single artboard, and 75 absolutely positioned layers would
+    // be waste. Each field still owns its own child, so painting one never
+    // disturbs another's marks.
+    let layer = adapter.host.querySelector(':scope > .pr-layer');
+    if (!layer) { layer = el('div', 'pr-layer'); adapter.host.appendChild(layer); }
+    f.layer = el('div', 'pr-field');
+    layer.appendChild(f.layer);
 
     // Our marks replace the browser's own underline; two systems at once
     // would be unreadable.
@@ -347,6 +353,50 @@
     };
   }
 
+  /* ---------- a contenteditable in ordinary DOM ---------- */
+
+  // For live-DOM editables the text is really there, so a Range measures it
+  // directly. The Social Card does not use this -- its text is drawn on a
+  // canvas and its overlay has a length-preserving contract of its own, so it
+  // supplies its own adapter.
+  function editableAdapter(node, opts) {
+    const o = opts || {};
+    const textAt = (offset) => {
+      const walk = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      let seen = 0, n;
+      while ((n = walk.nextNode())) {
+        const len = n.textContent.length;
+        if (seen + len >= offset) return { node: n, offset: offset - seen };
+        seen += len;
+      }
+      return n ? { node: n, offset: n.textContent.length } : null;
+    };
+    return {
+      name: o.name || node.className,
+      el: node,
+      register: o.register || 'display',
+      host: o.host || node.parentNode,
+      read: () => node.textContent || '',
+      hidden: () => node.offsetParent === null,
+      rects: (start, end) => {
+        const a = textAt(start), b = textAt(end);
+        if (!a || !b) return [];
+        const r = document.createRange();
+        r.setStart(a.node, a.offset);
+        r.setEnd(b.node, b.offset);
+        return [...r.getClientRects()].filter((q) => q.width > 0)
+          .map((q) => ({ x: q.left, y: q.top, w: q.width, h: q.height }));
+      },
+      replace: (start, end, text) => {
+        const cur = node.textContent || '';
+        node.textContent = cur.slice(0, start) + text + cur.slice(end);
+        // The host component keeps its own copy of this text and re-fits the
+        // box, so it has to hear about the change exactly as if it were typed.
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+    };
+  }
+
   /* ---------- wiring ---------- */
 
   function setNote(node) { note = node; syncCounter(); }
@@ -362,7 +412,7 @@
   window.addEventListener('scroll', () => { closePopup(); closePanel(); }, true);
 
   global.proofreadUI = {
-    attach, setNote, repaintAll, inputAdapter,
+    attach, setNote, repaintAll, inputAdapter, editableAdapter,
     recheckAll: () => { for (const f of fields) recheck(f); },
     counts,
     issues: () => fields.reduce((a, f) => a.concat(f.issues.map((i) => ({ ...i, field: f.adapter.name }))), []),
