@@ -122,13 +122,23 @@
   }
 
   function inDictionary(w) {
-    const lower = w.toLowerCase();
+    // The dictionary stores a straight apostrophe; this toolbox converts
+    // every apostrophe to a curly one automatically. Without folding them
+    // together, "don’t" -- which is what our own converter produces -- is
+    // not in the dictionary and every contraction in finished copy gets a
+    // red line under it.
+    const lower = w.toLowerCase().replace(/’/g, "'");
     if (terms.has(lower) || personal.has(lower)) return true;
     if (!words) return true;                               // no list, no verdict
     if (words.has(lower)) return true;
     // Possessive and contracted forms built on a known stem.
-    const m = lower.match(new RegExp('^(.+?)(?:[' + APOS + "'](?:s|re|ve|ll|d|m)|s[" + APOS + "'])$"));
+    const m = lower.match(/^(.+?)(?:'(?:s|re|ve|ll|d|m|t)|s')$/);
     if (m && words.has(m[1])) return true;
+    // Clipped participles: "goin’", "talkin’". Informal, but correct
+    // display copy, and the standard says not to flag conversational
+    // phrasing just for being informal.
+    // The tokenizer drops a trailing apostrophe, so both spellings arrive.
+    if (/in'?$/.test(lower) && words.has(lower.replace(/'$/, '') + 'g')) return true;
     // A hyphenated compound is fine when every part is.
     if (lower.includes('-')) {
       const parts = lower.split('-').filter(Boolean);
@@ -583,7 +593,14 @@
       const clash = out.some((g) => f.start < g.end && g.start < f.end);
       if (!clash) out.push(f);
     }
-    for (const f of out) f.text = text.slice(f.start, f.end);
+    for (const f of out) {
+      f.text = text.slice(f.start, f.end);
+      // A fix inherits the capital the writer used: "Their is" must become
+      // "There is", not "there is".
+      if (f.replacement && /^[A-Z]/.test(f.text) && /^[a-z]/.test(f.replacement)) {
+        f.replacement = f.replacement[0].toUpperCase() + f.replacement.slice(1);
+      }
+    }
     return out;
   }
 

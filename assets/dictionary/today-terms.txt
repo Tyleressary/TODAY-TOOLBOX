@@ -106,3 +106,10 @@ best-selling
 viral
 GOAT
 IYKYK
+
+# --- conversational forms the dictionary does not carry
+y'all
+y’all
+ok
+OK
+okay

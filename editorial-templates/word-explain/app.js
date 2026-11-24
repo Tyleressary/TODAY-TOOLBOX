@@ -173,6 +173,18 @@
     a.remove();
   });
 
+  // Proofreading: one field, and a word on a card is display copy, so the
+  // sentence-level rules stay out of its way. The control group is the host,
+  // so a mark sits under the input's own text.
+  if (window.proofreadUI && window.proofreader) {
+    const group = wordInput.closest('.control-group');
+    group.style.position = 'relative';
+    window.proofreadUI.attach(window.proofreadUI.inputAdapter(wordInput, {
+      name: 'word', register: 'display', host: group,
+    }));
+    window.proofreadUI.setNote(document.getElementById('proofNote'));
+  }
+
   // Canvas text ignores CSS font-loading timing, so paint once immediately
   // (falls back to a system font briefly) and again once Mada Black is
   // actually ready.

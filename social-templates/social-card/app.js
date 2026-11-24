@@ -1207,6 +1207,9 @@
     drawDragHighlight();
     syncEditables(l);
     syncBubbleLayer();
+    // The marks are positioned from the overlay's own glyph rects, so they
+    // have to be redrawn whenever the type is relaid.
+    if (window.proofreadUI) window.proofreadUI.repaintAll();
     reportSize(l);
   }
 
@@ -1987,6 +1990,88 @@
     document.body.appendChild(a); a.click(); a.remove();
   });
 
+  /* ---------- proofreading ---------- */
+
+  // Character offset -> (text node, offset). The editable is normally one
+  // text node, but execCommand('insertText') on a paste can split it, so the
+  // walk is the safe way to turn an offset from blockText() into a Range
+  // position.
+  function locate(el, offset) {
+    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let seen = 0, node;
+    while ((node = walk.nextNode())) {
+      const len = node.textContent.length;
+      if (seen + len >= offset) return { node, offset: offset - seen };
+      seen += len;
+    }
+    return node ? { node, offset: node.textContent.length } : null;
+  }
+
+  // How far down a line box the glyphs actually end. A Range rect is the
+  // LINE box, which for this type is taller than the ink, so a mark drawn at
+  // its foot floats well below the word. CSS puts half the leading above the
+  // ascent, so the ink ends that much plus the ascent down -- the same sum
+  // placeEditable uses to hit the baseline. Returned as a fraction, so it
+  // works whatever the card is scaled to.
+  function inkFraction(st, size) {
+    const m = metrics(st, size);
+    const lineH = size * st.leading;
+    const half = (lineH - (m.fontAscent + m.fontDescent)) / 2;
+    return Math.min(1, (half + m.fontAscent + m.descent * 0.45) / lineH);
+  }
+
+  function blockStyle(el) {
+    if (el === EDIT.eyebrow) return [EYEBROW, EYEBROW.size];
+    if (el === EDIT.dek) return [DEK, DEK.size];
+    return [headStyle(), lastLayout ? lastLayout.size : headStyle().min];
+  }
+
+  // Where a character range is drawn, in viewport pixels. One rect per line,
+  // because a flagged phrase can straddle one of the injected line breaks.
+  function proofRects(el, start, end) {
+    const a = locate(el, start), b = locate(el, end);
+    if (!a || !b) return [];
+    const r = document.createRange();
+    r.setStart(a.node, a.offset);
+    r.setEnd(b.node, b.offset);
+    const [st, size] = blockStyle(el);
+    const f = inkFraction(st, size);
+    return [...r.getClientRects()]
+      .filter((q) => q.width > 0)
+      .map((q) => ({ x: q.left, y: q.top, w: q.width, h: q.height * f }));
+  }
+
+  // Accepting a correction changes the text's length, which the typing path
+  // forbids -- so it commits exactly the way the blur tidy-up does: write the
+  // whole block, put the caret after the replacement, repaint.
+  function proofReplace(el, start, end, text) {
+    const cur = blockText(el);
+    const next = cur.slice(0, start) + text + cur.slice(end);
+    el.textContent = next;
+    if (document.activeElement === el) setCaretOffset(el, start + text.length);
+    if (el === EDIT.headline) headPristine = false;
+    render();
+  }
+
+  function wireProofreading() {
+    if (!window.proofreadUI || !window.proofreader) return;
+    const blocks = [
+      ['eyebrow', EDIT.eyebrow, 'display', () => !shown.eyebrow],
+      ['headline', EDIT.headline, 'display', () => false],
+      ['dek', EDIT.dek, 'prose', () => !shown.dek],
+    ];
+    for (const [name, el, register, hidden] of blocks) {
+      window.proofreadUI.attach({
+        name, el, register, hidden,
+        host: stage,
+        read: () => blockText(el),
+        rects: (a, b) => proofRects(el, a, b),
+        replace: (a, b, t) => proofReplace(el, a, b, t),
+      });
+    }
+    window.proofreadUI.setNote(document.getElementById('proofNote'));
+  }
+
   window.__card = {
     layout: chooseLayout, grad, gradientColour, sampleAt,
     picked: () => (pickedColour ? pickedColour.slice() : null),
@@ -2050,5 +2135,6 @@
 
   buildUploadSlot();
   buildBubbleControls();
+  wireProofreading();
   render();
 })();
