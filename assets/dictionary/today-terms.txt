@@ -1,0 +1,108 @@
+# Terms the general English dictionary does not carry: TODAY brands, franchises,
+# people and the vocabulary that keeps turning up in our copy. One per line,
+# case as you would write it. Lines starting with # are comments.
+#
+# Everyone on the team gets this list. Anything you add with "Add to dictionary"
+# in the toolbox is saved in your own browser on top of it -- add it here
+# instead when it is a name the whole team will use.
+
+# --- the brand and its franchises
+TODAY
+TODAY's
+Start TODAY
+TODAY Vault
+TODAY Archives
+Steals
+Deals
+Hoda
+Jenna
+Savannah
+Guthrie
+Kotb
+Roker
+Melvin
+Dreyer
+Daly
+Geist
+Kerry
+Sanders
+Melvin's
+Hoda's
+Savannah's
+
+# --- toolbox templates, so our own UI copy checks clean
+Toolbox
+Trivia
+Tease
+Dek
+dek
+eyebrow
+Bodoni
+Libre
+woff
+JPG
+PNG
+
+# --- words our copy uses that SCOWL's list does not carry
+influencer
+influencers
+Zendaya
+podcast
+podcasts
+podcaster
+docuseries
+rewatch
+rewatching
+binge
+bingeable
+meetup
+livestream
+livestreamed
+unboxing
+skincare
+haircare
+athleisure
+foodie
+foodies
+mocktail
+mocktails
+charcuterie
+airfryer
+TikTok
+TikToker
+Instagram
+Instagrammable
+YouTube
+YouTuber
+Reddit
+Spotify
+Netflix
+Hulu
+Peacock
+Broadway
+Grammys
+Emmys
+Oscars
+Tonys
+Golden
+Globes
+Super
+Bowl
+Olympics
+Paralympics
+NFL
+NBA
+MLB
+WNBA
+dupe
+dupes
+glow-up
+must-have
+must-haves
+game-changer
+game-changing
+best-seller
+best-selling
+viral
+GOAT
+IYKYK
