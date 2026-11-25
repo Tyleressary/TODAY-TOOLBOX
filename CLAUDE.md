@@ -132,6 +132,16 @@ so the whole team gets them, rather than in one person's browser.
 - Local assets carry a `?v=N` cache-busting query. Bump the version on a
   page when its own scripts or styles change.
 - `editorial-templates/calendar/calendar.css` is not edited.
+- The Social Card's type colour is one assignment in `drawLines()`, which is
+  the only place card type is coloured — add no second one. The presets are
+  white plus the four brand hexes and nothing is mixed or derived from them.
+  The overlay's caret and placeholder read `--card-ink` / `--card-ink-dim`
+  from the stage, so they can never disagree with the canvas.
+- The Social Card's contrast note is advisory and must stay that way: colour,
+  gradient and placement never adjust each other. It samples the backdrop
+  BEFORE the type is drawn — measured afterwards the type is part of its own
+  backdrop, reading high for dark ink and low for light ink — and it is
+  skipped entirely on the white default.
 - The Social Card's gradient has no position control and must not be given
   one: it is derived from Place. Bottom keeps the reference's bottom-up ramp,
   Top mirrors it, Centre draws none. `gradSide()` is the single source of that

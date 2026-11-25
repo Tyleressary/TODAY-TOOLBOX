@@ -110,7 +110,11 @@
   font-family: 'Source Sans 3 Canvas', var(--font-ui);
   text-align: center;
   color: transparent;
-  caret-color: #ffffff;
+  /* The caret and the placeholder are the type's colour, not white: on a
+     light image a white caret is invisible, and the overlay is the only
+     thing the writer can see of where they are. Set from JS beside the
+     canvas fill, so the two can never disagree. */
+  caret-color: var(--card-ink, #ffffff);
   outline: none;
   cursor: text;
   pointer-events: auto;
@@ -130,7 +134,7 @@
 /* Empty blocks keep a visible target, so there is always somewhere to click. */
 .edit-text:empty::before {
   content: attr(data-placeholder);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--card-ink-dim, rgba(255, 255, 255, 0.55));
 }
 
 .edit-hint {
@@ -478,6 +482,39 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* Type colour. Five flat squares that are nothing but their own hex, so the
+   control shows the thing it sets. The selected one is ringed in the same
+   purple .segmented uses for an active button, with a white gap inside the
+   ring so a dark swatch and a light one read the same way. */
+.ink-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ink-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  cursor: pointer;
+  transition: box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.ink-swatch:hover:not(.active) { border-color: var(--text-dim); }
+
+.ink-swatch:focus-visible {
+  outline: 2px solid var(--purple-500);
+  outline-offset: 2px;
+}
+
+.ink-swatch.active {
+  border-color: var(--purple-500);
+  box-shadow: 0 0 0 2px var(--bg-elevated) inset, 0 0 0 2px var(--purple-500);
 }
 
 .bubble-slot { display: inline-flex; align-items: center; gap: 2px; }

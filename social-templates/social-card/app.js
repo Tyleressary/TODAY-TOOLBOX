@@ -78,6 +78,7 @@
   // any saved link may still name it.) Vertically 'original' is the real
   // bottom-anchored composition and is its own state.
   const align = { h: 'center', v: 'original' };
+
   // Automatic editorial line breaking; off reverts to plain greedy wrapping.
   let typeset = true;
   function alignLeft() { return align.h === 'left'; }
@@ -92,6 +93,26 @@
   // +4% opened the eyebrow's, -2% pinched the dek's, -1% pinched the serif
   // headline's to 0.15em, where `Serif Headline` ran together. Stating the
   // advance keeps the three controls from moving each other.
+  // Type colour. White leads because white is what the card has always been
+  // and what the gradient is built to make readable; the other four are the
+  // brand's, given exactly as specified. Nothing here is derived or mixed --
+  // a preset is the literal hex that lands on the canvas, and the test reads
+  // it back off the rendered pixels rather than trusting this table.
+  const TEXT_INKS = [
+    { name: 'White', hex: '#ffffff', note: 'the default' },
+    { name: 'Dark charcoal', hex: '#363b43' },
+    { name: 'Yellow', hex: '#ffee00' },
+    { name: 'Light blue', hex: '#2cc4f1' },
+    { name: 'Red', hex: '#cc0e00' },
+  ];
+  // Contrast below this reads as a warning. 3:1 is WCAG's bar for large
+  // text, which every block on this card is.
+  const INK_MIN_CONTRAST = 3;
+
+  // The chosen colour, held for this card only: switching it must not touch
+  // placement, the gradient or anything else, and nothing else may touch it.
+  let ink = TEXT_INKS[0].hex;
+
   const EYEBROW = { family: SANS, weight: 900, size: 38, leading: 0.95, tracking: 0.04, wordSpace: 0.240 };
   const DEK = { family: SANS, weight: 500, size: 50, leading: 1.10, tracking: -0.02, wordSpace: 0.200 };
 
@@ -197,6 +218,8 @@
   const eyebrowToggle = document.getElementById('eyebrowToggle');
   const dekToggle = document.getElementById('dekToggle');
   const sizeNote = document.getElementById('sizeNote');
+  const inkNote = document.getElementById('inkNote');
+  const inkRow = document.getElementById('inkRow');
   const bubbleNote = document.getElementById('bubbleNote');
   const bubbleRow = document.getElementById('bubbleRow');
   const bubbleLayer = document.getElementById('bubbleLayer');
@@ -1220,7 +1243,9 @@
   /* ---------- render ---------- */
 
   function drawLines(lines, baselines, st, size) {
-    ctx.fillStyle = '#ffffff';
+    // Every block -- eyebrow, headline, dek -- comes through here, so one
+    // assignment colours all three and none of them can drift from another.
+    ctx.fillStyle = ink;
     ctx.textBaseline = 'alphabetic';
     const left = alignLeft();
     lines.forEach((line, i) => drawLine(line, baselines[i], st, size, left));
@@ -1265,6 +1290,9 @@
       rescuing = false;
       return;
     }
+    // Read the backdrop before any type goes on it, or the check would be
+    // measuring the type against itself.
+    syncInkNote(l);
     const hs = headStyle();
     drawLines(l.eyeLines, l.eyeBaselines, EYEBROW, EYEBROW.size);
     drawLines(l.headLines, l.headBaselines, hs, l.size);
@@ -1760,6 +1788,112 @@
     img.src = url;
   }
 
+  /* ---------- type colour ---------- */
+
+  // Built in JS rather than written out in the markup so the swatch colour,
+  // the accessible name and the value can only ever come from one table.
+  function buildInkRow() {
+    inkRow.textContent = '';
+    TEXT_INKS.forEach((c) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ink-swatch' + (c.hex === ink ? ' active' : '');
+      b.style.setProperty('--ink', c.hex);
+      b.dataset.ink = c.hex;
+      b.title = c.note ? `${c.name} ${c.hex.toUpperCase()} — ${c.note}` : `${c.name} ${c.hex.toUpperCase()}`;
+      b.setAttribute('aria-label', b.title);
+      b.setAttribute('aria-pressed', String(c.hex === ink));
+      b.addEventListener('click', () => setInk(c.hex));
+      inkRow.appendChild(b);
+    });
+  }
+
+  function setInk(hex) {
+    const found = TEXT_INKS.find((c) => c.hex === hex);
+    if (!found) return;
+    ink = found.hex;
+    [...inkRow.children].forEach((b) => {
+      const on = b.dataset.ink === ink;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    syncInkVars();
+    render();
+  }
+
+  // The overlay's caret and placeholder follow the canvas fill.
+  function syncInkVars() {
+    stage.style.setProperty('--card-ink', ink);
+    stage.style.setProperty('--card-ink-dim', `color-mix(in srgb, ${ink} 55%, transparent)`);
+  }
+
+  // Relative luminance and the WCAG ratio, on the sRGB values actually drawn.
+  function relLum([r, g, b]) {
+    const f = (v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  }
+  function contrast(a, b) {
+    const l1 = relLum(a), l2 = relLum(b);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  }
+  function hexRGB(h) {
+    return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  }
+
+  // What the type will sit on, read off the frame as it stands before the
+  // type is drawn. A 60x75 thumbnail of the card costs one drawImage and one
+  // 18KB read, where sampling the full-size band would copy megabytes a
+  // keystroke -- and the average is the same either way.
+  // What the last render measured. Kept rather than recomputed on demand,
+  // because the only moment the backdrop can be read is before the type goes
+  // on it -- ask afterwards and the type is part of its own backdrop, which
+  // reads high for dark ink and low for light ink.
+  let lastInkRatio = null;
+
+  const backdropCanvas = document.createElement('canvas');
+  backdropCanvas.width = 60; backdropCanvas.height = 75;
+  const backdropCtx = backdropCanvas.getContext('2d', { willReadFrequently: true });
+
+  function inkContrast(l) {
+    const boxes = textBoxes(l);
+    if (!boxes.length) return null;
+    backdropCtx.clearRect(0, 0, 60, 75);
+    backdropCtx.drawImage(canvas, 0, 0, 60, 75);
+    const d = backdropCtx.getImageData(0, 0, 60, 75).data;
+    let r = 0, g = 0, b = 0, n = 0;
+    for (const box of boxes) {
+      const x0 = Math.max(0, Math.floor(box.x0 / W * 60)), x1 = Math.min(59, Math.ceil(box.x1 / W * 60));
+      const y0 = Math.max(0, Math.floor(box.y0 / H * 75)), y1 = Math.min(74, Math.ceil(box.y1 / H * 75));
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+        const i = (y * 60 + x) * 4;
+        r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
+      }
+    }
+    if (!n) return null;
+    return contrast(hexRGB(ink), [r / n, g / n, b / n]);
+  }
+
+  // Advisory only. Colour, gradient and placement never move each other --
+  // this just says when the combination is hard to read, and says nothing at
+  // all on the white default, which is the case the gradient is built for.
+  function syncInkNote(l) {
+    if (ink === TEXT_INKS[0].hex) {
+      lastInkRatio = null;
+      inkNote.textContent = ''; inkNote.className = 'size-note'; return;
+    }
+    const ratio = inkContrast(l);
+    lastInkRatio = ratio;
+    if (ratio === null || ratio >= INK_MIN_CONTRAST) {
+      inkNote.textContent = '';
+      inkNote.className = 'size-note';
+      return;
+    }
+    const name = (TEXT_INKS.find((c) => c.hex === ink) || {}).name || 'This colour';
+    inkNote.className = 'size-note is-warning';
+    inkNote.textContent = `${name} is low contrast on this background (${ratio.toFixed(1)}:1). `
+      + 'Readable display text wants 3:1.';
+  }
+
   /* ---------- bubble images and controls ---------- */
 
   function thumbOf(img) {
@@ -2206,6 +2340,11 @@
     bubbleLegal: (i, cx, cy) => bubbleLegal(i, cx, cy, keepOut(chooseLayout())),
     bubbleNote: () => bubbleNote.textContent,
     bgPan: () => (photo ? { panX: photo.panX, panY: photo.panY, zoom: photo.scaleMultiplier } : null),
+    INKS: TEXT_INKS.map((c) => ({ ...c })),
+    ink: () => ink,
+    setInk,
+    inkRatio: () => lastInkRatio,
+    inkNote: () => inkNote.textContent,
     exportURL: () => canvas.toDataURL('image/jpeg', EXPORT_Q),
     defaults: { ...DEFAULT_HEAD },
     caps: () => ({ ...CAP }),
@@ -2221,6 +2360,8 @@
   window.addEventListener('resize', syncScale);
 
   buildUploadSlot();
+  buildInkRow();
+  syncInkVars();
   buildBubbleControls();
   wireProofreading();
   render();

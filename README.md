@@ -362,6 +362,43 @@ edit the copy, export a 1200×1500 JPG.
   rewriting them as `height × H` is the same number on paper and one ulp away
   in binary, which is enough to move a rasterised edge and the default card's
   hash.
+- **Four preset text colours, plus the white default.** Dark Charcoal
+  `#363B43`, Yellow `#FFEE00`, Light Blue `#2CC4F1` and Red `#CC0E00`, as five
+  swatches in the second control row: each square is painted in the hex it
+  sets, so the control is the thing it does, and White leads it marked as the
+  default. White is not a fifth brand colour — it is what the card has always
+  been — and having it there is what makes the choice reversible in one click
+  rather than by a hidden gesture.
+
+  One assignment does the work: `drawLines()` is the only place card type is
+  coloured, and eyebrow, headline and dek all go through it, so none can drift
+  from another and nothing about the font, size, weight, tracking, placement
+  or alignment is touched. The TODAY lockup is a white PNG and deliberately
+  stays white. The overlay follows the canvas — `--card-ink` and
+  `--card-ink-dim` drive the caret and the placeholder — because a white caret
+  on a light image is invisible, and the caret is the only part of the overlay
+  the writer can see.
+
+  Room for the group was measured, not assumed: worst case, two bubbles loaded
+  at 1100px, the rows had 158px and 162px free, and the label plus five 20px
+  swatches is about 115px. It goes in row 2 before Bubbles, which is the group
+  whose width varies. The suite asserts both rows stay on one line at 71/61px
+  and the page at 1244, at 1440, 1280 and 1100px.
+- **The contrast note is advisory, and that is the whole design.** Colour,
+  gradient and placement never move each other. But the gradient exists to
+  make *white* text readable, so a preset on a scrim built for white can be
+  unreadable: on the default card light blue type measures **1.1:1** and
+  yellow **1.9:1**, while charcoal is a comfortable **4.8:1**. Below WCAG's
+  3:1 for large text, `#inkNote` says so and gives the ratio. It reads the
+  backdrop rather than the colour — load a dark photo and the verdicts swap,
+  charcoal to 1.4:1 and yellow to 13.2:1, which the suite checks in both
+  directions so the note cannot degenerate into something that always fires.
+
+  It is measured on a 60×75 thumbnail of the frame taken after the backdrop
+  and bubbles are drawn and before the type goes on — read it afterwards and
+  the type is part of its own backdrop, which flatters dark ink and libels
+  light ink. The whole check is skipped on the white default, so the original
+  card does no extra work per keystroke.
 - **The gradient is optional, where there is one.** The Gradient checkbox is
   the Colour group's own label, which is what keeps the control bar to one row
   — a sixth group, or a third item in Show, would wrap it and cost the page
