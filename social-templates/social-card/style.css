@@ -484,6 +484,53 @@
   gap: var(--space-2);
 }
 
+/* The logo picker. The preview is the real PNG, each on the backdrop that
+   makes it readable -- a white lockup needs something dark behind it and a
+   black one something light -- so the chip shows what you are choosing
+   rather than describing it. */
+.logo-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.logo-pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 52 rather than 56: at 56 the bar had 23px of slack at 1100px with two
+     bubbles loaded, under the 30px margin this row is held to. The preview
+     loses nothing -- the lockup is 46px wide inside it either way. */
+  width: 52px;
+  height: 22px;
+  padding: 0 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.logo-pick img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.logo-pick.is-white { background: #363b43; }
+.logo-pick.is-black { background: #ffffff; }
+
+.logo-pick:hover:not(.active) { border-color: var(--text-dim); }
+
+.logo-pick:focus-visible {
+  outline: 2px solid var(--purple-500);
+  outline-offset: 2px;
+}
+
+.logo-pick.active {
+  border-color: var(--purple-500);
+  box-shadow: 0 0 0 2px var(--purple-500);
+}
+
 /* Type colour. Five flat squares that are nothing but their own hex, so the
    control shows the thing it sets. The selected one is ringed in the same
    purple .segmented uses for an active button, with a white gap inside the

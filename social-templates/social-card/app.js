@@ -231,6 +231,7 @@
   const inkNote = document.getElementById('inkNote');
   const inkRow = document.getElementById('inkRow');
   const eyebrowRow = document.getElementById('eyebrowRow');
+  const logoRow = document.getElementById('logoRow');
   const bubbleNote = document.getElementById('bubbleNote');
   const bubbleRow = document.getElementById('bubbleRow');
   const bubbleLayer = document.getElementById('bubbleLayer');
@@ -260,9 +261,23 @@
   let picking = false;
   let photoLayer = null; // offscreen copy of the photo alone, for sampling
 
-  const logoImg = new Image();
-  logoImg.onload = () => render();
-  logoImg.src = '../../assets/logo-white.png';
+  // The two official lockups. Both files are 720x98, so logoRect() returns
+  // the same box whichever is selected and switching cannot move, resize or
+  // reflow anything -- the dek gap and the bubble guard both read that rect.
+  // Both are preloaded, so a switch never shows a frame without the lockup.
+  const LOGOS = [
+    { key: 'white', name: 'White', file: 'logo-white.png' },
+    { key: 'black', name: 'Black', file: 'logo-black.png' },
+  ];
+  const logoImgs = {};
+  LOGOS.forEach((l) => {
+    const img = new Image();
+    img.onload = () => render();
+    img.src = `../../assets/${l.file}`;
+    logoImgs[l.key] = img;
+  });
+  let logoKey = 'white';
+  let logoImg = logoImgs.white;
 
   // Canvas text needs the real face before the first measurement, or wrapping
   // and auto-sizing would be computed against a fallback.
@@ -1800,6 +1815,42 @@
     img.src = url;
   }
 
+  /* ---------- logo colour ---------- */
+
+  // The preview is the asset itself in an <img>, not a drawing of it, each on
+  // the backdrop that makes it legible: dark behind the white lockup, light
+  // behind the black one.
+  function buildLogoRow() {
+    logoRow.textContent = '';
+    LOGOS.forEach((l) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `logo-pick is-${l.key}` + (l.key === logoKey ? ' active' : '');
+      b.dataset.logo = l.key;
+      b.title = `${l.name} TODAY logo`;
+      b.setAttribute('aria-label', b.title);
+      b.setAttribute('aria-pressed', String(l.key === logoKey));
+      const img = document.createElement('img');
+      img.src = `../../assets/${l.file}`;
+      img.alt = '';
+      b.appendChild(img);
+      b.addEventListener('click', () => setLogo(l.key));
+      logoRow.appendChild(b);
+    });
+  }
+
+  function setLogo(key) {
+    if (!logoImgs[key]) return;
+    logoKey = key;
+    logoImg = logoImgs[key];
+    [...logoRow.children].forEach((b) => {
+      const on = b.dataset.logo === logoKey;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    render();
+  }
+
   /* ---------- type colour ---------- */
 
   // Built in JS rather than written out in the markup so the swatch colour,
@@ -2410,6 +2461,9 @@
     bubbleLegal: (i, cx, cy) => bubbleLegal(i, cx, cy, keepOut(chooseLayout())),
     bubbleNote: () => bubbleNote.textContent,
     bgPan: () => (photo ? { panX: photo.panX, panY: photo.panY, zoom: photo.scaleMultiplier } : null),
+    LOGOS: LOGOS.map((l) => ({ ...l })),
+    logo: () => logoKey,
+    setLogo,
     INKS: TEXT_INKS.map((c) => ({ ...c })),
     EYEBROW_INKS: EYEBROW_INKS.map((c) => ({ ...c })),
     ink: () => ink,
@@ -2434,6 +2488,7 @@
   window.addEventListener('resize', syncScale);
 
   buildUploadSlot();
+  buildLogoRow();
   buildInkRows();
   syncInkVars();
   buildBubbleControls();

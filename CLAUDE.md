@@ -132,6 +132,13 @@ so the whole team gets them, rather than in one person's browser.
 - Local assets carry a `?v=N` cache-busting query. Bump the version on a
   page when its own scripts or styles change.
 - `editorial-templates/calendar/calendar.css` is not edited.
+- The Social Card's black lockup `assets/logo-black.png` is pre-sized from the
+  official artwork by `assets/logo-black.build.py`, and must stay that way.
+  The supplied original is 11723x1671: drawing it at the card's 247x34 costs
+  136ms a render against a ~37ms keystroke budget, and its transparent
+  padding would shift the mark. Both lockups are 720x98 so `logoRect()` is
+  identical for either — the dek gap and the bubble guard both read that
+  rect, so a file of another size would move the composition.
 - The Social Card's type colour is one assignment in `drawLines()`, which is
   the only place card type is coloured — add no second one; the colour
   arrives as an argument. The body (headline and dek) is White or Charcoal;

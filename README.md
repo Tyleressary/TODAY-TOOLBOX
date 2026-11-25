@@ -446,6 +446,37 @@ edit the copy, export a 1200×1500 JPG.
   Google-hosted Source Sans 3 is a separate family and is unaffected.
 - The white lockup at `assets/logo-white.png` is `logo.png` with every opaque
   pixel painted white; the arc's ring gaps are already transparent, so they survive.
+- **Two lockups, white or black, chosen from a preview of the asset itself.**
+  The chip holds the real PNG in an `<img>` on the backdrop that makes it
+  legible — dark behind the white mark, light behind the black — so the
+  control shows what it sets. White is the default and the default card is
+  unchanged.
+
+  `assets/logo-black.png` is the official black artwork, pre-sized, and the
+  reasons are measured. As supplied it is **11723×1671 — 19.6 megapixels,
+  ~75 MB decoded — and drawing it into the card's 247×34 box costs 136ms per
+  render**, against a budget of about 37ms for a keystroke; it also carries
+  transparent padding the white file does not (191px right, 55 top and
+  bottom), so dropped into the same box the mark would sit shifted and ~1.6%
+  small. `assets/logo-black.build.py` is the whole transformation: crop to
+  the alpha bounding box, scale to 720 wide with Lanczos on premultiplied
+  alpha, and bottom-align in a transparent 720×98 canvas. Nothing is redrawn,
+  recoloured or approximated.
+
+  The artwork is 0.55% wider in proportion than the white file (7.3876
+  against 7.3469), so fitting 720 wide leaves 97 rows in a 98-row canvas.
+  Centring would round half a pixel either way — both measured 0.50px off
+  white's centroid — so it is bottom-aligned, because the lockup is anchored
+  on the card's bottom margin and that is the edge the eye lines up. The cost
+  of pre-sizing is 36.3 dB against an exact area-average versus 34.5 dB, on a
+  mark 34px tall.
+
+  Both files being 720×98 is what makes the switch safe: `logoRect()` returns
+  the identical box either way, so the dek gap and the bubble guard that both
+  read it cannot move. The suite checks that, checks the two alpha
+  silhouettes overlap (IoU 0.966 — enough to catch a wrong or redrawn file
+  dropped in later), and checks that switching changes **zero** pixels
+  outside the lockup's own rect.
 - **The page is laid out for one screen.** Image, Colour, Strength, Height and the
   Show toggles share a single control bar above the card, File name and Download
   sit on one row directly beneath it, and the vertical rhythm is tightened against
