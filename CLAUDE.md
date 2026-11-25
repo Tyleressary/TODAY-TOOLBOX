@@ -172,6 +172,24 @@ so the whole team gets them, rather than in one person's browser.
   placed both above and below centred text. At 75 or 100 there is nowhere legal
   to put one and the bubble appears frozen. Do not raise it without re-running
   the free-space count.
+- `social-templates/social-card/` is the **Carousel Builder** now: a workspace
+  of many cards around the same single card engine. `app.js` renders the card
+  and binds element ids, never a layout, which is why the workspace could be
+  built around it without forking it — keep it that way. `carousel.js` owns
+  the cards, the rail, the style selector and the toolbar slot, and reaches
+  the card only through `window.__card`.
+- One engine, one live card. A page can hold exactly one instance of the card
+  because it binds ids, so a second card is a second state object, not a
+  second renderer: `getState()` / `setState()` swap the whole document in and
+  out. Add a field to the card and it must join `getState()`, or that field
+  will leak from one card to the next.
+- The workspace's own layout rules, replacing the one-row control bar's page
+  height of 1244 and row heights of 71/61, which no longer exist: at 1440x900
+  the card keeps its 4:5 aspect and the download row stays on screen, the rail
+  and the toolbar scroll inside themselves, and below 1040px the three columns
+  stack. That breakpoint is not cosmetic — without it the style bar overlaps
+  the card at phone widths and a click on the card's top-left lands on a
+  style button.
 - The Social Card's default state is a regression invariant, at two levels.
   The canvas pixels hash `a14fcf56d18e9ea3`; that is the design itself and
   must not move. The exported file hashes `dadee5dc637029f2`. The older

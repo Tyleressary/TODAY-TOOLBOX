@@ -169,6 +169,278 @@
   padding: clamp(10px, 1.8vw, 16px) var(--space-4);
 }
 
+/* ===================================================================
+   The Carousel Builder workspace. Style selector across the top, the
+   cards down the left, the card being edited in the middle, its
+   toolbar on the right, file name and download under the canvas.
+
+   The card itself is untouched by all of this: the engine binds ids,
+   not places, so the same markup renders the same pixels wherever the
+   grid puts it. What used to be a one-row control bar is now the right
+   column -- the old page-height and row-height invariants described
+   that bar and are replaced here by: no page scroll at 1440x900, the
+   rail and the toolbar scrolling inside themselves, and the canvas
+   column never squeezing the card below its own aspect.
+   =================================================================== */
+
+.builder {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.style-bar {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+
+.style-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 8px 18px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+
+.style-btn:hover:not(:disabled):not(.active) { background: var(--band); }
+
+.style-btn.active {
+  background: var(--purple-500);
+  border-color: var(--purple-500);
+  color: #ffffff;
+}
+
+/* Visible from the start, as asked, but honest about not being built: a
+   style with no layout yet cannot be chosen, and says which phase brings
+   it rather than silently doing nothing. */
+.style-btn:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.style-btn:disabled::after {
+  content: "soon";
+  margin-left: 7px;
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--band);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+.builder-grid {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr) 286px;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.col-title {
+  margin: 0 0 7px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* Left rail. It scrolls inside itself, so twenty cards cannot push the
+   download button off the screen. */
+.rail-col { min-width: 0; }
+
+.card-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.card-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--gray-100);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.14s ease;
+}
+
+.card-thumb:hover:not(.active) { border-color: var(--text-dim); }
+.card-thumb.active { border-color: var(--accent); }
+
+.card-thumb img,
+.card-thumb canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* The number sits on the thumbnail rather than beside it, so the rail
+   stays as narrow as the card it previews. */
+.card-thumb-no {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  background: rgba(16, 18, 24, 0.72);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.card-thumb.active .card-thumb-no { background: var(--accent); }
+
+.add-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: 9px 0;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.add-card:hover { border-color: var(--accent); color: var(--accent); }
+.add-card-plus { font-size: 16px; line-height: 1; }
+
+/* Centre column: the card, its notes, and the export row. */
+.canvas-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Right column: one slot, one panel per style. */
+.card-tools {
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.card-tools .layout-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+
+/* The control groups were laid out as a horizontal bar; in a column they
+   stack, and the rows that used to split them are just two stacks. */
+.card-tools .panel-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+/* In a column the groups read as a list, so they align left rather than
+   inheriting the centring the horizontal bar needed. */
+.card-tools .control-group {
+  width: 100%;
+  align-items: flex-start;
+}
+
+.card-tools .control-label,
+.card-tools .check-label { text-align: left; }
+
+.card-tools .panel-row + .panel-row {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.card-tools .upload-group .file-input,
+.card-tools .upload-group .zoom-row,
+.card-tools input[type="range"] { width: 100%; }
+
+.tool-panel[hidden] { display: none; }
+
+/* Narrow windows and phones. Three columns need about 1040px before the
+   canvas starts losing to its neighbours; below that they stack, the rail
+   turns into a strip above the card, and the page is allowed to scroll --
+   the no-scroll rule is a desktop rule, not a promise to fit a phone. */
+@media (max-width: 1040px) {
+  .builder-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .card-rail {
+    flex-direction: row;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 6px;
+  }
+
+  .card-thumb { flex: 0 0 84px; }
+
+  .add-card {
+    width: auto;
+    margin-top: 0;
+    align-self: flex-start;
+    padding: 9px 14px;
+  }
+
+  .rail-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .card-tools { max-height: none; }
+
+  /* Stacked, the card is no longer competing with anything for height. */
+  .canvas-col .card-stage { width: min(560px, 100%); }
+}
+
+.is-stub {
+  padding: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+.stub-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
 .tool-main {
   gap: var(--space-2);
   padding-bottom: var(--space-3);
@@ -181,11 +453,27 @@
 }
 
 /* The frame hugs the card instead of running the full column width. */
-.tool-main > .canvas-wrap {
-  padding: var(--space-2);
-  width: max-content;
-  max-width: 100%;
-  margin: 0 auto;
+/* The stage was capped at 560px inside a centred wrapper. Here it is capped
+   by the room left on screen as well, because the workspace has to fit
+   without the download button falling below the fold: the card is 4:5, so
+   the height left over times 0.8 is the width it can take. 270px is the
+   chrome above and below it -- brand band, style bar, the grid's gap, the
+   edit hint and the export row -- measured, not guessed. */
+.canvas-col .card-stage {
+  width: min(560px, 100%, calc((100vh - 270px) * 0.8));
+  max-width: none;
+}
+
+.canvas-col #canvas { max-width: none; }
+
+/* The side columns get the same budget, and scroll inside it. */
+.card-rail { max-height: calc(100vh - 400px); }
+.card-tools { max-height: calc(100vh - 270px); }
+
+.canvas-col .export-panel {
+  margin-top: var(--space-1);
+  width: 100%;
+  max-width: 560px;
 }
 
 .home-link { margin-bottom: var(--space-3); }

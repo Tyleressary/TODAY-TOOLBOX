@@ -3,27 +3,86 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Social Card | TODAY Toolbox</title>
+<title>Carousel Builder | TODAY Toolbox</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Bodoni:ital,wght@0,400..700;1,400..700&family=Source+Sans+3:wght@400;600;700;900&display=swap">
 <link rel="stylesheet" href="../../assets/toolbox.css?v=12">
   <link rel="stylesheet" href="../../assets/proofread.css?v=2">
-  <link rel="stylesheet" href="style.css?v=24">
+  <link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
   <header class="page-shell">
     <div class="brand-band">
       <img src="../../assets/logo.png?v=3" alt="TODAY" class="site-logo">
-      <h1 class="brand-word">Social Card</h1>
+      <h1 class="brand-word">Carousel Builder</h1>
     </div>
   </header>
 
-  <main class="tool-main">
-    <section class="layout-panel" aria-label="Image and gradient">
-      <!-- Two explicit rows: eight groups no longer fit one. Image and
-           gradient above, the text controls below. Explicit rather than
-           left to flex-wrap, so the split cannot flip on a 1px measurement. -->
+  <main class="builder">
+    <!-- Card style. All five are here from the start so the workspace never
+         has to be rearranged to make room; the four that have no layout yet
+         are disabled rather than faked, and say which phase brings them. -->
+    <nav class="style-bar" id="styleBar" aria-label="Card style"></nav>
+
+    <div class="builder-grid">
+      <!-- Left: every card in the carousel. The selected one is live in the
+           centre; the others are the last frame they rendered. -->
+      <aside class="rail-col" aria-label="Cards">
+        <h2 class="col-title">Cards</h2>
+        <div class="card-rail" id="cardRail"></div>
+        <button type="button" class="add-card" id="addCard">
+          <span class="add-card-plus" aria-hidden="true">+</span>
+          <span>Add card</span>
+        </button>
+      </aside>
+
+      <!-- Centre: the card being edited, and the controls that belong to the
+           card rather than to the workspace. -->
+      <section class="canvas-col" aria-label="Card">
+      <div class="card-stage" id="stage">
+        <canvas id="canvas" width="1200" height="1500"></canvas>
+        <div class="edit-layer">
+          <div class="edit-text" id="edEyebrow" contenteditable="plaintext-only"
+               role="textbox" aria-label="Eyebrow" data-placeholder="Eyebrow">Eyebrow text</div>
+          <div class="edit-text" id="edHeadline" contenteditable="plaintext-only"
+               role="textbox" aria-label="Headline" data-placeholder="Click to add a headline">Use Source Sans 3 Black at 65pt for Long Headlines and Keep Extended Headline Treatments Within Four Lines Maximum</div>
+          <div class="edit-text" id="edDek" contenteditable="plaintext-only"
+               role="textbox" aria-label="Dek" data-placeholder="Dek">The dek goes here when needed and it’s in Source Sans 3 Medium, 50pt</div>
+        </div>
+        <!-- Bubble chrome and hit targets. Deliberately an SVG over the canvas
+             rather than canvas drawing: selection rings and guides can then
+             never reach toDataURL, and a circle here hit-tests above the
+             editable layer, so a click on a bubble is not swallowed by the
+             text. The viewBox matches the card, so geometry is written in
+             canvas pixels and scales itself. -->
+        <svg class="bubble-layer" id="bubbleLayer" viewBox="0 0 1200 1500"
+             preserveAspectRatio="xMidYMid meet" role="group" aria-label="Image bubbles"></svg>
+        <div class="loupe" id="loupe" hidden aria-hidden="true">
+          <canvas id="loupeCanvas" width="90" height="90"></canvas>
+          <span class="loupe-hex" id="loupeHex"></span>
+        </div>
+      </div>
+        <p class="edit-hint">Click any text on the card to edit it.</p>
+        <p class="size-note" id="sizeNote"></p>
+        <p class="size-note" id="bubbleNote"></p>
+        <p class="size-note" id="inkNote"></p>
+        <p class="size-note" id="proofNote"></p>
+
+        <section class="export-panel" aria-label="Export">
+          <label for="filename">File name</label>
+          <input id="filename" type="text" placeholder="social-card" autocomplete="off">
+          <button type="button" id="downloadBtn">Download JPG</button>
+        </section>
+      </section>
+
+      <!-- Right: the toolbar for whichever style is selected. One slot, one
+           panel per style; there is deliberately no generic panel holding
+           every control in the toolbox. -->
+      <aside class="card-tools" aria-label="Editing toolbar">
+        <h2 class="col-title" id="toolsTitle">Headline controls</h2>
+        <div class="tools-slot" id="toolsSlot">
+          <div class="tool-panel layout-panel" id="panelHeadline" data-style="headline">
       <div class="panel-row">
         <div class="control-group upload-group" id="uploadRow"></div>
         <div class="control-group">
@@ -110,45 +169,13 @@
           <div class="bubble-row" id="bubbleRow" role="group" aria-labelledby="bubbleLabel"></div>
         </div>
       </div>
-    </section>
-
-    <section class="canvas-wrap">
-      <div class="card-stage" id="stage">
-        <canvas id="canvas" width="1200" height="1500"></canvas>
-        <div class="edit-layer">
-          <div class="edit-text" id="edEyebrow" contenteditable="plaintext-only"
-               role="textbox" aria-label="Eyebrow" data-placeholder="Eyebrow">Eyebrow text</div>
-          <div class="edit-text" id="edHeadline" contenteditable="plaintext-only"
-               role="textbox" aria-label="Headline" data-placeholder="Click to add a headline">Use Source Sans 3 Black at 65pt for Long Headlines and Keep Extended Headline Treatments Within Four Lines Maximum</div>
-          <div class="edit-text" id="edDek" contenteditable="plaintext-only"
-               role="textbox" aria-label="Dek" data-placeholder="Dek">The dek goes here when needed and it’s in Source Sans 3 Medium, 50pt</div>
+          </div>
+          <div class="tool-panel is-stub" id="panelStub" data-style="stub" hidden>
+            <p class="stub-note" id="stubNote"></p>
+          </div>
         </div>
-        <!-- Bubble chrome and hit targets. Deliberately an SVG over the canvas
-             rather than canvas drawing: selection rings and guides can then
-             never reach toDataURL, and a circle here hit-tests above the
-             editable layer, so a click on a bubble is not swallowed by the
-             text. The viewBox matches the card, so geometry is written in
-             canvas pixels and scales itself. -->
-        <svg class="bubble-layer" id="bubbleLayer" viewBox="0 0 1200 1500"
-             preserveAspectRatio="xMidYMid meet" role="group" aria-label="Image bubbles"></svg>
-        <div class="loupe" id="loupe" hidden aria-hidden="true">
-          <canvas id="loupeCanvas" width="90" height="90"></canvas>
-          <span class="loupe-hex" id="loupeHex"></span>
-        </div>
-      </div>
-    </section>
-
-    <p class="edit-hint">Click any text on the card to edit it.</p>
-    <p class="size-note" id="sizeNote"></p>
-    <p class="size-note" id="bubbleNote"></p>
-    <p class="size-note" id="inkNote"></p>
-    <p class="size-note" id="proofNote"></p>
-
-    <section class="export-panel" aria-label="Export">
-      <label for="filename">File name</label>
-      <input id="filename" type="text" placeholder="social-card" autocomplete="off">
-      <button type="button" id="downloadBtn">Download JPG</button>
-    </section>
+      </aside>
+    </div>
 
     <div class="center-row">
       <a class="home-link" href="../index.html">
@@ -165,6 +192,7 @@
   <script src="../../assets/smart-punctuation.js?v=19"></script>
   <script src="../../assets/proofreader.js?v=1"></script>
   <script src="../../assets/proofread-ui.js?v=1"></script>
-  <script src="app.js?v=28"></script>
+  <script src="app.js?v=29"></script>
+  <script src="carousel.js?v=1"></script>
 </body>
 </html>

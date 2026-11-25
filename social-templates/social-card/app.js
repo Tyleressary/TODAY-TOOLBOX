@@ -1335,6 +1335,10 @@
     drawDragHighlight();
     syncEditables(l);
     syncBubbleLayer();
+    // One hook, for whatever hosts this card. The Carousel Builder uses it to
+    // refresh the selected card's thumbnail when the card actually repaints,
+    // rather than polling for changes it cannot see.
+    if (typeof window.__cardRendered === 'function') window.__cardRendered();
     // The marks are positioned from the overlay's own glyph rects, so they
     // have to be redrawn whenever the type is relaid.
     if (window.proofreadUI) window.proofreadUI.repaintAll();
@@ -2413,7 +2417,99 @@
     window.proofreadUI.setNote(document.getElementById('proofNote'));
   }
 
+  /* ---------- the card as a document ---------- */
+
+  // Everything that makes this card THIS card, and nothing transient: no
+  // drag, no selection, no dropper arming. A host can hold one of these per
+  // card and swap them through the single live engine. Images are kept as
+  // the decoded Image objects they already are -- nothing is re-encoded, so
+  // a round trip through here cannot cost a card any quality.
+  function panelState(p) {
+    return p ? { img: p.img, scaleMultiplier: p.scaleMultiplier, panX: p.panX, panY: p.panY } : null;
+  }
+
+  function getState() {
+    return {
+      text: {
+        eyebrow: EDIT.eyebrow.textContent,
+        headline: EDIT.headline.textContent,
+        dek: EDIT.dek.textContent,
+      },
+      headPristine,
+      headKey,
+      align: { ...align },
+      typeset,
+      ink,
+      eyebrowInk,
+      logoKey,
+      shown: { ...shown },
+      grad: { ...grad },
+      pickedColour: pickedColour ? pickedColour.slice() : null,
+      photo: panelState(photo),
+      bubbles: bubbles.map((b) => (b ? { ...panelState(b), cx: b.cx, cy: b.cy, thumb: b.thumb } : null)),
+      filename: filenameInput.value,
+    };
+  }
+
+  function setState(st) {
+    if (!st) return;
+    EDIT.eyebrow.textContent = st.text.eyebrow;
+    EDIT.headline.textContent = st.text.headline;
+    EDIT.dek.textContent = st.text.dek;
+    headPristine = !!st.headPristine;
+    headKey = st.headKey in HEAD_STYLES ? st.headKey : 'sans';
+    fontSelect.value = headKey;
+    align.h = st.align.h; align.v = st.align.v;
+    [[alignXGroup, 'h'], [alignYGroup, 'v']].forEach(([group, axis]) => {
+      [...group.querySelectorAll('button')].forEach((b) => {
+        const on = b.dataset.v === align[axis];
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', String(on));
+      });
+    });
+    typeset = !!st.typeset;
+    typesetToggle.checked = typeset;
+    Object.assign(shown, st.shown);
+    eyebrowToggle.checked = shown.eyebrow;
+    dekToggle.checked = shown.dek;
+    gradToggle.checked = shown.gradient;
+    Object.assign(grad, st.grad);
+    strengthRange.value = String(grad.strength);
+    heightRange.value = String(grad.height);
+    pickedColour = st.pickedColour ? st.pickedColour.slice() : null;
+    photo = st.photo ? { ...st.photo } : null;
+    photoLayer = null;
+    bubbles[0] = st.bubbles[0] ? { ...st.bubbles[0] } : null;
+    bubbles[1] = st.bubbles[1] ? { ...st.bubbles[1] } : null;
+    selected = -1;
+    adjusting = false;
+    bubbleDrag = null;
+    picking = false;
+    filenameInput.value = st.filename || '';
+    // The colour and eyebrow setters each repaint; call them before the
+    // rebuilds so the controls are marked from the state that is now live.
+    ink = TEXT_INKS.some((c) => c.hex === st.ink) ? st.ink : TEXT_INKS[0].hex;
+    eyebrowInk = st.eyebrowInk && EYEBROW_INKS.some((c) => c.hex === st.eyebrowInk) ? st.eyebrowInk : null;
+    syncInkRows();
+    syncInkVars();
+    logoKey = logoImgs[st.logoKey] ? st.logoKey : 'white';
+    logoImg = logoImgs[logoKey];
+    [...logoRow.children].forEach((b) => {
+      const on = b.dataset.logo === logoKey;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    buildUploadSlot();
+    buildBubbleControls();
+    syncGradientEnabled();
+    syncColour();
+    syncDropperEnabled();
+    render();
+  }
+
   window.__card = {
+    getState,
+    setState,
     layout: chooseLayout, grad, gradientColour, sampleAt,
     picked: () => (pickedColour ? pickedColour.slice() : null),
     picking: () => picking,

@@ -488,6 +488,46 @@ edit the copy, export a 1200×1500 JPG.
 
 More tools will be added to the toolbox over time, linked from the home page (`/index.html`).
 
+  **The Carousel Builder workspace.** The tool is a carousel of cards now,
+  laid out the way the wireframe asks: the style selector across the top with
+  all five styles, the cards down the left, the card being edited in the
+  middle, its toolbar on the right, file name and download beneath the canvas.
+
+  None of the card was rebuilt to get there. `app.js` binds 36 element **ids**
+  and one class and nothing about where they sit, and its asset paths resolve
+  the same from any tool folder — so the workspace page lays those ids out
+  differently and loads the same engine. The default card still renders to
+  `a14fcf56d18e9ea3`, pixel for pixel what it was before the workspace
+  existed, which is the measurement that says the card survived the move.
+
+  **One engine, many cards.** A page can hold exactly one live instance of the
+  card, because it binds ids; so a second card is not a second renderer but a
+  second state object. `getState()` / `setState()` move a whole card document
+  — text, placement, typeset, colours, gradient, logo, the background photo
+  and both bubbles, as the decoded images they already are — in and out of the
+  one engine, driving the setters that already existed rather than writing
+  behind them. The visible consequence: the centre canvas is the only live
+  card and a thumbnail is the last frame its card rendered, refreshed from a
+  `window.__cardRendered` hook rather than by polling.
+
+  **The toolbar is a slot, not a grab-bag.** Each style registers its own
+  panel and the selected style mounts one; Headline's panel is the existing
+  controls, moved into the column. The other four styles are in the selector
+  from the start — so the workspace is never rearranged to make room — and are
+  disabled with the phase that brings them, rather than faked with a
+  placeholder layout that would be thrown away.
+
+  **What replaced the one-screen rule.** The page used to be pinned at 1244px
+  tall with two control rows at 71/61px on one line; that described the bar
+  this workspace removes. In its place: at 1440×900 the card holds its 4:5
+  aspect and the download row stays on screen, the rail and the toolbar scroll
+  inside themselves, and the card's width is capped by the height left over
+  (`(100vh − 270px) × 0.8`, the 270 measured, not guessed). Below **1040px**
+  the three columns stack — and that breakpoint is load-bearing rather than
+  polish: without it the style bar overlaps the card at phone widths, and a
+  click on the card's top-left corner lands on a style button. The editing
+  suite found that at 420px.
+
   **Image bubbles.** Up to two circular photo bubbles can be dropped on the
   card. The geometry is measured off the supplied reference, not estimated:
   outer diameter **433px**, a **5.5px** pure white ring and so a **422px**
