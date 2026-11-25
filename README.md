@@ -362,43 +362,50 @@ edit the copy, export a 1200×1500 JPG.
   rewriting them as `height × H` is the same number on paper and one ulp away
   in binary, which is enough to move a rasterised edge and the default card's
   hash.
-- **Four preset text colours, plus the white default.** Dark Charcoal
-  `#363B43`, Yellow `#FFEE00`, Light Blue `#2CC4F1` and Red `#CC0E00`, as five
-  swatches in the second control row: each square is painted in the hex it
-  sets, so the control is the thing it does, and White leads it marked as the
-  default. White is not a fifth brand colour — it is what the card has always
-  been — and having it there is what makes the choice reversible in one click
-  rather than by a hidden gesture.
+- **Two text colours for the body, three states for the eyebrow.** The
+  headline and dek share one choice — **White `#FFFFFF`** or **Charcoal
+  `#363B43`** — and the eyebrow follows them unless it is deliberately set to
+  **Blue `#2CC4F1`** or **Red `#CC0E00`**. Two swatch groups in the second
+  control row, each square painted in the hex it sets, with the eyebrow's
+  Automatic chip showing the colour it is inheriting under a small `A` so it
+  cannot be mistaken for a fixed colour.
 
-  One assignment does the work: `drawLines()` is the only place card type is
-  coloured, and eyebrow, headline and dek all go through it, so none can drift
-  from another and nothing about the font, size, weight, tracking, placement
-  or alignment is touched. The TODAY lockup is a white PNG and deliberately
-  stays white. The overlay follows the canvas — `--card-ink` and
-  `--card-ink-dim` drive the caret and the placeholder — because a white caret
-  on a light image is invisible, and the caret is the only part of the overlay
-  the writer can see.
+  Automatic is `null`, not a copy of the body colour, and that is the whole
+  mechanism: the eyebrow's colour is resolved as `eyebrowInk || ink` at paint
+  time, so an automatic eyebrow cannot fall out of step and an overridden one
+  cannot be quietly overwritten when the body changes. `drawLines()` is still
+  the only place card type is coloured; the colour now arrives as an argument
+  rather than being read from one variable.
 
-  Room for the group was measured, not assumed: worst case, two bubbles loaded
-  at 1100px, the rows had 158px and 162px free, and the label plus five 20px
-  swatches is about 115px. It goes in row 2 before Bubbles, which is the group
-  whose width varies. The suite asserts both rows stay on one line at 71/61px
-  and the page at 1244, at 1440, 1280 and 1100px.
-- **The contrast note is advisory, and that is the whole design.** Colour,
-  gradient and placement never move each other. But the gradient exists to
-  make *white* text readable, so a preset on a scrim built for white can be
-  unreadable: on the default card light blue type measures **1.1:1** and
-  yellow **1.9:1**, while charcoal is a comfortable **4.8:1**. Below WCAG's
-  3:1 for large text, `#inkNote` says so and gives the ratio. It reads the
-  backdrop rather than the colour — load a dark photo and the verdicts swap,
-  charcoal to 1.4:1 and yellow to 13.2:1, which the suite checks in both
-  directions so the note cannot degenerate into something that always fires.
+  The overlay follows per block — the stage carries the body colour, the
+  eyebrow element overrides it on itself — so each caret is the colour of the
+  type it sits in. A white caret on a light image is invisible, and the caret
+  is the only part of the overlay a writer can see.
 
-  It is measured on a 60×75 thumbnail of the frame taken after the backdrop
-  and bubbles are drawn and before the type goes on — read it afterwards and
-  the type is part of its own backdrop, which flatters dark ink and libels
-  light ink. The whole check is skipped on the white default, so the original
-  card does no extra work per keystroke.
+  Swatches are **18px, not 20**, and that is measured rather than aesthetic:
+  with both groups at 20px the control bar had 11px of slack at 1100px with
+  two bubbles loaded, one font-metric shift from wrapping and costing the
+  page its one-screen fit. 18px leaves 21px. The suite pins both rows to one
+  line at 71/61px and the page at 1244 across three viewports.
+- **The contrast note judges each colour against its own blocks**, and it
+  treats white differently for a reason worth recording. The body colour is
+  measured against the backdrop under the headline and dek, the eyebrow
+  against its own line, and whichever falls under WCAG's 3:1 for large text
+  is named. On the default card a blue eyebrow measures **1.3:1** and is
+  flagged while charcoal body copy at **4.7:1** is not.
+
+  White is exempt *while the gradient is behind it*. The measurement is the
+  argument: the scrim exists for white, and the reference design puts white
+  over the thin upper part of it at **1.6–1.8:1** — the backdrop behind the
+  headline is `(170,200,215)` and only near the very bottom does it reach
+  3.7:1. Judging white at 3:1 with the scrim on would open the tool with a
+  warning about the design itself, which is the one thing a checker must
+  never do. With no scrim — Centre placement, or the gradient switched off —
+  white has nothing working for it and is judged like any other colour:
+  **1.1:1** on a bright photo, which is the genuinely unreadable case and the
+  one this note used to miss. The suite checks the rule in all four
+  directions: scrim on silent, scrim off flagged, gradient toggled off on the
+  same card flagged, and charcoal there fine at 10.2:1.
 - **The gradient is optional, where there is one.** The Gradient checkbox is
   the Colour group's own label, which is what keeps the control bar to one row
   — a sixth group, or a third item in Show, would wrap it and cost the page

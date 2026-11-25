@@ -494,9 +494,13 @@
   gap: 5px;
 }
 
+/* 18 rather than 20, and the reason is measured: with both groups in row 2
+   at 20px the bar had 11px of slack at 1100px with two bubbles loaded, which
+   is one font-metric shift away from wrapping and costing the page its
+   one-screen fit. 18px gives 21px of slack. */
 .ink-swatch {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -510,6 +514,28 @@
 .ink-swatch:focus-visible {
   outline: 2px solid var(--purple-500);
   outline-offset: 2px;
+}
+
+/* Automatic is not a colour of its own: it shows the colour it is
+   inheriting, with a mark so it cannot be mistaken for a fixed one. */
+.ink-swatch.is-auto {
+  position: relative;
+  color: #ffffff;
+}
+
+.ink-swatch.is-auto::after {
+  content: "A";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 800;
+  /* Legible on whichever colour it is standing in for, light or dark. */
+  color: color-mix(in srgb, var(--ink) 50%, #000000);
+  mix-blend-mode: luminosity;
 }
 
 .ink-swatch.active {

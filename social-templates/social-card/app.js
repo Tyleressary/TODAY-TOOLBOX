@@ -98,20 +98,30 @@
   // brand's, given exactly as specified. Nothing here is derived or mixed --
   // a preset is the literal hex that lands on the canvas, and the test reads
   // it back off the rendered pixels rather than trusting this table.
+  // Body: headline and dek, which always share one colour.
   const TEXT_INKS = [
     { name: 'White', hex: '#ffffff', note: 'the default' },
-    { name: 'Dark charcoal', hex: '#363b43' },
-    { name: 'Yellow', hex: '#ffee00' },
-    { name: 'Light blue', hex: '#2cc4f1' },
+    { name: 'Charcoal', hex: '#363b43' },
+  ];
+  // Eyebrow: automatic, or one of two accents. Automatic is null rather than
+  // a copy of the body colour, and that is the whole mechanism -- the drawn
+  // colour is resolved as `eyebrowInk || ink` at paint time, so an automatic
+  // eyebrow cannot fall out of step with the body and an overridden one
+  // cannot be quietly overwritten when the body changes.
+  const EYEBROW_INKS = [
+    { name: 'Automatic', hex: null, note: 'follows the headline' },
+    { name: 'Blue', hex: '#2cc4f1' },
     { name: 'Red', hex: '#cc0e00' },
   ];
   // Contrast below this reads as a warning. 3:1 is WCAG's bar for large
   // text, which every block on this card is.
   const INK_MIN_CONTRAST = 3;
 
-  // The chosen colour, held for this card only: switching it must not touch
-  // placement, the gradient or anything else, and nothing else may touch it.
+  // Held for this card only: switching either must not touch placement, the
+  // gradient or anything else, and nothing else may touch them.
   let ink = TEXT_INKS[0].hex;
+  let eyebrowInk = null;                       // null = automatic
+  const eyebrowResolved = () => eyebrowInk || ink;
 
   const EYEBROW = { family: SANS, weight: 900, size: 38, leading: 0.95, tracking: 0.04, wordSpace: 0.240 };
   const DEK = { family: SANS, weight: 500, size: 50, leading: 1.10, tracking: -0.02, wordSpace: 0.200 };
@@ -220,6 +230,7 @@
   const sizeNote = document.getElementById('sizeNote');
   const inkNote = document.getElementById('inkNote');
   const inkRow = document.getElementById('inkRow');
+  const eyebrowRow = document.getElementById('eyebrowRow');
   const bubbleNote = document.getElementById('bubbleNote');
   const bubbleRow = document.getElementById('bubbleRow');
   const bubbleLayer = document.getElementById('bubbleLayer');
@@ -1242,10 +1253,11 @@
 
   /* ---------- render ---------- */
 
-  function drawLines(lines, baselines, st, size) {
-    // Every block -- eyebrow, headline, dek -- comes through here, so one
-    // assignment colours all three and none of them can drift from another.
-    ctx.fillStyle = ink;
+  function drawLines(lines, baselines, st, size, colour) {
+    // Still the only place card type is coloured; the colour now arrives as
+    // an argument because the eyebrow may differ from the body. One
+    // assignment, one caller per block, nothing to drift.
+    ctx.fillStyle = colour;
     ctx.textBaseline = 'alphabetic';
     const left = alignLeft();
     lines.forEach((line, i) => drawLine(line, baselines[i], st, size, left));
@@ -1294,9 +1306,9 @@
     // measuring the type against itself.
     syncInkNote(l);
     const hs = headStyle();
-    drawLines(l.eyeLines, l.eyeBaselines, EYEBROW, EYEBROW.size);
-    drawLines(l.headLines, l.headBaselines, hs, l.size);
-    drawLines(l.dekLines, l.dekBaselines, DEK, DEK.size);
+    drawLines(l.eyeLines, l.eyeBaselines, EYEBROW, EYEBROW.size, eyebrowResolved());
+    drawLines(l.headLines, l.headBaselines, hs, l.size, ink);
+    drawLines(l.dekLines, l.dekBaselines, DEK, DEK.size, ink);
     // Leave no spacing set on the context for whatever draws next.
     if (CAP.letterSpacing) ctx.letterSpacing = '0px';
     if ('wordSpacing' in ctx) ctx.wordSpacing = '0px';
@@ -1792,19 +1804,42 @@
 
   // Built in JS rather than written out in the markup so the swatch colour,
   // the accessible name and the value can only ever come from one table.
-  function buildInkRow() {
-    inkRow.textContent = '';
-    TEXT_INKS.forEach((c) => {
+  function buildInkRows() {
+    const swatch = (c, selected, onPick, auto) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'ink-swatch' + (c.hex === ink ? ' active' : '');
-      b.style.setProperty('--ink', c.hex);
-      b.dataset.ink = c.hex;
-      b.title = c.note ? `${c.name} ${c.hex.toUpperCase()} — ${c.note}` : `${c.name} ${c.hex.toUpperCase()}`;
+      b.className = 'ink-swatch' + (selected ? ' active' : '') + (auto ? ' is-auto' : '');
+      b.style.setProperty('--ink', c.hex || eyebrowResolved());
+      b.dataset.ink = c.hex === null ? 'auto' : c.hex;
+      b.title = c.hex === null ? `${c.name} — ${c.note}`
+        : c.note ? `${c.name} ${c.hex.toUpperCase()} — ${c.note}`
+        : `${c.name} ${c.hex.toUpperCase()}`;
       b.setAttribute('aria-label', b.title);
-      b.setAttribute('aria-pressed', String(c.hex === ink));
-      b.addEventListener('click', () => setInk(c.hex));
-      inkRow.appendChild(b);
+      b.setAttribute('aria-pressed', String(selected));
+      b.addEventListener('click', onPick);
+      return b;
+    };
+    inkRow.textContent = '';
+    TEXT_INKS.forEach((c) => inkRow.appendChild(swatch(c, c.hex === ink, () => setInk(c.hex))));
+    eyebrowRow.textContent = '';
+    EYEBROW_INKS.forEach((c) => eyebrowRow.appendChild(
+      swatch(c, c.hex === eyebrowInk, () => setEyebrowInk(c.hex), c.hex === null)));
+  }
+
+  // Both rows are re-marked on either change, because the Automatic chip
+  // shows the colour it is inheriting and so has to repaint when the body
+  // colour moves under it.
+  function syncInkRows() {
+    [...inkRow.children].forEach((b) => {
+      const on = b.dataset.ink === ink;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    [...eyebrowRow.children].forEach((b) => {
+      const on = b.dataset.ink === (eyebrowInk === null ? 'auto' : eyebrowInk);
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+      if (b.dataset.ink === 'auto') b.style.setProperty('--ink', ink);
     });
   }
 
@@ -1812,19 +1847,29 @@
     const found = TEXT_INKS.find((c) => c.hex === hex);
     if (!found) return;
     ink = found.hex;
-    [...inkRow.children].forEach((b) => {
-      const on = b.dataset.ink === ink;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-pressed', String(on));
-    });
+    syncInkRows();
     syncInkVars();
     render();
   }
 
-  // The overlay's caret and placeholder follow the canvas fill.
+  // null returns the eyebrow to automatic.
+  function setEyebrowInk(hex) {
+    if (hex !== null && !EYEBROW_INKS.some((c) => c.hex === hex)) return;
+    eyebrowInk = hex;
+    syncInkRows();
+    syncInkVars();
+    render();
+  }
+
+  // The overlay's caret and placeholder follow the canvas fill, per block:
+  // the stage carries the body colour and the eyebrow overrides it on itself,
+  // so each caret is the colour of the type it is sitting in.
   function syncInkVars() {
+    const dim = (c) => `color-mix(in srgb, ${c} 55%, transparent)`;
     stage.style.setProperty('--card-ink', ink);
-    stage.style.setProperty('--card-ink-dim', `color-mix(in srgb, ${ink} 55%, transparent)`);
+    stage.style.setProperty('--card-ink-dim', dim(ink));
+    EDIT.eyebrow.style.setProperty('--card-ink', eyebrowResolved());
+    EDIT.eyebrow.style.setProperty('--card-ink-dim', dim(eyebrowResolved()));
   }
 
   // Relative luminance and the WCAG ratio, on the sRGB values actually drawn.
@@ -1854,44 +1899,69 @@
   backdropCanvas.width = 60; backdropCanvas.height = 75;
   const backdropCtx = backdropCanvas.getContext('2d', { willReadFrequently: true });
 
+  // Two colours can be in play, so each is judged against the backdrop under
+  // the blocks it actually paints: the body against headline and dek, the
+  // eyebrow against its own line.
   function inkContrast(l) {
     const boxes = textBoxes(l);
     if (!boxes.length) return null;
     backdropCtx.clearRect(0, 0, 60, 75);
     backdropCtx.drawImage(canvas, 0, 0, 60, 75);
     const d = backdropCtx.getImageData(0, 0, 60, 75).data;
-    let r = 0, g = 0, b = 0, n = 0;
-    for (const box of boxes) {
-      const x0 = Math.max(0, Math.floor(box.x0 / W * 60)), x1 = Math.min(59, Math.ceil(box.x1 / W * 60));
-      const y0 = Math.max(0, Math.floor(box.y0 / H * 75)), y1 = Math.min(74, Math.ceil(box.y1 / H * 75));
-      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-        const i = (y * 60 + x) * 4;
-        r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
+    const mean = (want) => {
+      let r = 0, g = 0, b = 0, n = 0;
+      for (const box of boxes) {
+        if (!want(box.block)) continue;
+        const x0 = Math.max(0, Math.floor(box.x0 / W * 60)), x1 = Math.min(59, Math.ceil(box.x1 / W * 60));
+        const y0 = Math.max(0, Math.floor(box.y0 / H * 75)), y1 = Math.min(74, Math.ceil(box.y1 / H * 75));
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          const i = (y * 60 + x) * 4;
+          r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
+        }
       }
-    }
-    if (!n) return null;
-    return contrast(hexRGB(ink), [r / n, g / n, b / n]);
+      return n ? [r / n, g / n, b / n] : null;
+    };
+    const out = [];
+    const body = mean((k) => k === 'headline' || k === 'dek');
+    if (body) out.push({ what: 'body', label: 'The headline', ratio: contrast(hexRGB(ink), body) });
+    const eye = mean((k) => k === 'eyebrow');
+    if (eye) out.push({ what: 'eyebrow', label: 'The eyebrow', ratio: contrast(hexRGB(eyebrowResolved()), eye) });
+    if (!out.length) return null;
+    out.sort((a, b2) => a.ratio - b2.ratio);
+    return out;
   }
 
   // Advisory only. Colour, gradient and placement never move each other --
   // this just says when the combination is hard to read, and says nothing at
   // all on the white default, which is the case the gradient is built for.
+  // White is a special case, and measurement is why. The scrim exists FOR
+  // white, and the reference design puts white over the thin upper part of
+  // it at 1.6-1.8:1 -- so judging white at 3:1 with the gradient on would
+  // open the tool with a warning about the design itself, which is the one
+  // thing a checker must never do. With no scrim behind it, though, white
+  // has nothing working for it and is judged like any other colour: that is
+  // the genuinely unreadable case -- centred text, or the gradient off, over
+  // a bright photo -- and the one this note used to miss entirely.
+  function judged(colour) {
+    return colour !== TEXT_INKS[0].hex || !gradientOn();
+  }
+
   function syncInkNote(l) {
-    if (ink === TEXT_INKS[0].hex) {
-      lastInkRatio = null;
-      inkNote.textContent = ''; inkNote.className = 'size-note'; return;
-    }
-    const ratio = inkContrast(l);
-    lastInkRatio = ratio;
-    if (ratio === null || ratio >= INK_MIN_CONTRAST) {
+    const rows = inkContrast(l);
+    lastInkRatio = rows ? rows[0].ratio : null;
+    const bad = (rows || []).filter((r) => r.ratio < INK_MIN_CONTRAST
+      && judged(r.what === 'eyebrow' ? eyebrowResolved() : ink));
+    if (!bad.length) {
       inkNote.textContent = '';
       inkNote.className = 'size-note';
       return;
     }
-    const name = (TEXT_INKS.find((c) => c.hex === ink) || {}).name || 'This colour';
     inkNote.className = 'size-note is-warning';
-    inkNote.textContent = `${name} is low contrast on this background (${ratio.toFixed(1)}:1). `
-      + 'Readable display text wants 3:1.';
+    inkNote.textContent = bad.length > 1
+      ? `The headline and the eyebrow are both low contrast on this background `
+        + `(${bad.map((r) => r.ratio.toFixed(1)).join(':1 and ')}:1). Readable display text wants 3:1.`
+      : `${bad[0].label} is low contrast on this background (${bad[0].ratio.toFixed(1)}:1). `
+        + 'Readable display text wants 3:1.';
   }
 
   /* ---------- bubble images and controls ---------- */
@@ -2341,8 +2411,12 @@
     bubbleNote: () => bubbleNote.textContent,
     bgPan: () => (photo ? { panX: photo.panX, panY: photo.panY, zoom: photo.scaleMultiplier } : null),
     INKS: TEXT_INKS.map((c) => ({ ...c })),
+    EYEBROW_INKS: EYEBROW_INKS.map((c) => ({ ...c })),
     ink: () => ink,
     setInk,
+    eyebrowInk: () => eyebrowInk,
+    eyebrowResolved,
+    setEyebrowInk,
     inkRatio: () => lastInkRatio,
     inkNote: () => inkNote.textContent,
     exportURL: () => canvas.toDataURL('image/jpeg', EXPORT_Q),
@@ -2360,7 +2434,7 @@
   window.addEventListener('resize', syncScale);
 
   buildUploadSlot();
-  buildInkRow();
+  buildInkRows();
   syncInkVars();
   buildBubbleControls();
   wireProofreading();

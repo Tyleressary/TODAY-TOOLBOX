@@ -133,15 +133,25 @@ so the whole team gets them, rather than in one person's browser.
   page when its own scripts or styles change.
 - `editorial-templates/calendar/calendar.css` is not edited.
 - The Social Card's type colour is one assignment in `drawLines()`, which is
-  the only place card type is coloured — add no second one. The presets are
-  white plus the four brand hexes and nothing is mixed or derived from them.
-  The overlay's caret and placeholder read `--card-ink` / `--card-ink-dim`
-  from the stage, so they can never disagree with the canvas.
+  the only place card type is coloured — add no second one; the colour
+  arrives as an argument. The body (headline and dek) is White or Charcoal;
+  the eyebrow follows it unless overridden to Blue or Red. Automatic is
+  `null`, never a copy of the body colour, and the drawn colour is resolved
+  as `eyebrowInk || ink` at paint time — copying it instead would let an
+  automatic eyebrow fall out of step or an override be overwritten. The
+  overlay's caret and placeholder read `--card-ink` / `--card-ink-dim`, set
+  on the stage for the body and on the eyebrow element for itself.
 - The Social Card's contrast note is advisory and must stay that way: colour,
   gradient and placement never adjust each other. It samples the backdrop
   BEFORE the type is drawn — measured afterwards the type is part of its own
-  backdrop, reading high for dark ink and low for light ink — and it is
-  skipped entirely on the white default.
+  backdrop, reading high for dark ink and low for light ink — and each colour
+  is judged against the blocks it actually paints.
+  White is exempt while the gradient is behind it, and that is measured, not
+  lenience: the scrim exists for white, and the reference design puts white
+  over its thin upper part at 1.6–1.8:1, so judging white there would open
+  the tool with a warning about the design itself. With no scrim (Centre
+  placement, or the gradient off) white is judged like any other colour.
+  Do not "fix" the exemption without re-measuring the default card.
 - The Social Card's gradient has no position control and must not be given
   one: it is derived from Place. Bottom keeps the reference's bottom-up ramp,
   Top mirrors it, Centre draws none. `gradSide()` is the single source of that
