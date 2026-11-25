@@ -132,6 +132,14 @@ so the whole team gets them, rather than in one person's browser.
 - Local assets carry a `?v=N` cache-busting query. Bump the version on a
   page when its own scripts or styles change.
 - `editorial-templates/calendar/calendar.css` is not edited.
+- The Social Card's gradient has no position control and must not be given
+  one: it is derived from Place. Bottom keeps the reference's bottom-up ramp,
+  Top mirrors it, Centre draws none. `gradSide()` is the single source of that
+  truth and `gradientOn()` combines it with the user's checkbox; the colour
+  sampling band follows the same rule. The bottom case's arithmetic
+  (`gradStart() * H`, `H - startY`) is left exactly as written — the
+  algebraically identical `height * H` differs by an ulp and moves the
+  default card's pixels.
 - The Social Card's bubble edge inset is 60px, and that number is load-bearing
   rather than cosmetic: it is the largest inset at which a 433px bubble can be
   placed both above and below centred text. At 75 or 100 there is nowhere legal

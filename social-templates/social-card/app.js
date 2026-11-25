@@ -150,6 +150,22 @@
   function gradStart() { return 1 - grad.height; }
   function gradNeutralise() { return grad.strength; }
   function gradOpacity() { return Math.min(1, 0.55 + 0.65 * grad.strength); }
+
+  // Which edge the scrim sits against, and it is deliberately NOT a control
+  // of its own: the gradient exists to put contrast behind the type, so it
+  // belongs wherever Place has put the type. Bottom -- the original
+  // composition -- keeps the reference's bottom-up ramp untouched, Top
+  // mirrors it, and centred text has no edge to anchor a scrim to, so there
+  // is none: a band across the middle would darken the whole frame.
+  function gradSide() {
+    if (align.v === 'top') return 'top';
+    if (align.v === 'center') return 'none';
+    return 'bottom';
+  }
+
+  // The checkbox stays the user's own preference; this is whether anything
+  // is actually drawn. Both have to be true.
+  function gradientOn() { return shown.gradient && gradSide() !== 'none'; }
   const NEUTRAL = [0x36, 0x3b, 0x43]; // --gray-600
 
   const canvas = document.getElementById('canvas');
@@ -171,6 +187,7 @@
   const colourText = document.getElementById('colourText');
   const colourChip = document.getElementById('colourChip');
   const colourReset = document.getElementById('colourReset');
+  const colourLabel = document.getElementById('colourLabel');
   const loupe = document.getElementById('loupe');
   const loupeCanvas = document.getElementById('loupeCanvas');
   const loupeCtx = loupeCanvas.getContext('2d');
@@ -1152,10 +1169,15 @@
     const { drawW, drawH, panXpx, panYpx } = panelImageMetrics(photo, bbox);
     const cx = W / 2 + panXpx, cy = H / 2 + panYpx;
     const scale = drawW / photo.img.width;
-    const bandTop = gradStart() * H;
+    // The band the scrim covers moves with it, so Auto keeps reading the
+    // part of the photo the gradient will sit on. With no gradient at all
+    // (centred text) the historical bottom band is kept, so the colour chip
+    // does not jump about while the control is disabled.
+    const bandTop = gradSide() === 'top' ? 0 : gradStart() * H;
+    const bandH = H - gradStart() * H;
     const sx = (0 - (cx - drawW / 2)) / scale;
     const sy = (bandTop - (cy - drawH / 2)) / scale;
-    const sw = W / scale, sh = (H - bandTop) / scale;
+    const sw = W / scale, sh = bandH / scale;
     try { sctx.drawImage(photo.img, sx, sy, sw, sh, 0, 0, 40, 40); }
     catch (e) { return [0xc9, 0xed, 0xfa]; }
     const d = sctx.getImageData(0, 0, 40, 40).data;
@@ -1172,8 +1194,17 @@
 
   function drawGradient() {
     const [r, g, b] = gradientColour();
+    // startY and H - startY are left exactly as they were for the bottom
+    // case, down to the floating point: rewriting them as height * H is the
+    // same number on paper and one ulp away in binary, which is enough to
+    // move a rasterised edge. The top case mirrors those two values rather
+    // than deriving its own.
     const startY = gradStart() * H;
-    const gr = ctx.createLinearGradient(0, startY, 0, H);
+    const band = H - startY;
+    const top = gradSide() === 'top';
+    // p = 0 is the transparent end, p = 1 the dense end at the card's edge.
+    const gr = top ? ctx.createLinearGradient(0, band, 0, 0)
+                   : ctx.createLinearGradient(0, startY, 0, H);
     // A few eased stops rather than one linear ramp, so the onset stays soft.
     const stops = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1];
     const op = gradOpacity();
@@ -1182,7 +1213,8 @@
       gr.addColorStop(p, `rgba(${r}, ${g}, ${b}, ${a})`);
     });
     ctx.fillStyle = gr;
-    ctx.fillRect(0, startY, W, H - startY);
+    if (top) ctx.fillRect(0, 0, W, band);
+    else ctx.fillRect(0, startY, W, H - startY);
   }
 
   /* ---------- render ---------- */
@@ -1209,7 +1241,7 @@
       ctx.fillRect(0, 0, W, H);
     }
 
-    if (shown.gradient) drawGradient();
+    if (gradientOn()) drawGradient();
     syncColour();
 
     // Above the background and the gradient, below all type and the lockup.
@@ -1611,9 +1643,11 @@
 
   function syncDropperEnabled() {
     const has = !!(photo && photo.img);
-    const usable = has && shown.gradient;
+    const usable = has && gradientOn();
     dropperBtn.disabled = !usable;
-    dropperBtn.title = !shown.gradient
+    dropperBtn.title = gradSide() === 'none'
+      ? 'Centred text has no gradient to pick a colour for'
+      : !shown.gradient
       ? 'Turn the gradient on to pick a colour for it'
       : has ? 'Pick a colour from the image'
             : 'Upload an image to pick a colour from it';
@@ -1878,6 +1912,9 @@
         b.classList.toggle('active', on);
         b.setAttribute('aria-pressed', String(on));
       });
+      // Place decides whether there is a gradient at all, so the whole
+      // colour group has to be re-enabled or greyed before the repaint.
+      syncGradientEnabled();
       render();
     });
     [...group.querySelectorAll('button')].forEach((b) =>
@@ -1894,10 +1931,18 @@
     render();
   });
 
-  // The gradient's three controls mean nothing while it is off, and the picked
-  // colour is kept so switching back restores exactly what was there.
+  // The gradient's controls mean nothing while nothing is drawn, and the
+  // picked colour is kept so switching back restores exactly what was there.
+  // Centred text disables the checkbox as well, because there the absence of
+  // a gradient is the design and not something to be switched on; the user's
+  // own on/off preference is held in shown.gradient and comes back untouched
+  // on the way out of Centre.
   function syncGradientEnabled() {
-    const on = shown.gradient;
+    const centred = gradSide() === 'none';
+    const on = gradientOn();
+    gradToggle.checked = on;
+    gradToggle.disabled = centred;
+    colourLabel.title = centred ? 'Centred text is shown on the bare image' : '';
     strengthRange.disabled = !on;
     heightRange.disabled = !on;
     colourReset.disabled = !on;
@@ -2122,7 +2167,8 @@
     styles: { EYEBROW, DEK, HEAD_STYLES },
     pristine: () => headPristine,
     align,
-    setAlign: (h, v) => { if (h) align.h = h; if (v) align.v = v; render(); },
+    setAlign: (h, v) => { if (h) align.h = h; if (v) align.v = v; syncGradientEnabled(); render(); },
+    gradSide, gradientOn: () => gradientOn(),
     setTypeset: (on) => { typeset = !!on; typesetToggle.checked = !!on; render(); },
     typeset: () => typeset,
     polishLines, blockText, lineFault, isolatedCount, raggedness, endsPhrase, TYPESET,

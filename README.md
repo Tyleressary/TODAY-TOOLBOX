@@ -342,15 +342,36 @@ edit the copy, export a 1200×1500 JPG.
   (pre-shift), so it asks "does this fit?" rather than "where was it moved to?".
   Copy that will not fit still warns rather than clipping.
 
-  One consequence worth knowing: Top placement lifts the text clear of the
-  gradient, so on a bright image white text can lose contrast there. The
-  gradient Height control is the lever for that.
-- **The gradient is optional.** The Gradient checkbox is the Colour group's own
-  label, which is what keeps the control bar to one row — a sixth group, or a
-  third item in Show, would wrap it and cost the page its one-screen fit. Off,
-  the card is the flat photo and the dropper, swatch, Strength and Height are
-  disabled; the picked colour is remembered, so turning it back on restores
-  exactly what was there.
+- **The scrim follows the text, with no control of its own.** The gradient is
+  there to put contrast behind the type, so it goes wherever Place has put the
+  type: **Bottom → the scrim at the bottom** (the reference composition,
+  untouched), **Top → the same ramp mirrored to the top**, **Centre → no
+  gradient at all**. It is derived, not configured: there is no gradient
+  position control to set, and changing Place repaints immediately.
+
+  Centre gets nothing rather than a band across the middle, which would darken
+  the whole frame and leave no clear edge anywhere. The consequence is real
+  and deliberate: centred text sits on the bare photograph, so a bright or
+  busy image will fight it. Top placement has the matching consequence at the
+  other end — the lockup sits outside the scrim, on the bare image.
+
+  The Auto colour follows too. `dominantColour()` samples only the band the
+  gradient covers, so the sampled band mirrors with it and a top scrim takes
+  its colour from the top of the photo. The bottom case's `startY` and
+  `H − startY` are left exactly as they were, down to the floating point:
+  rewriting them as `height × H` is the same number on paper and one ulp away
+  in binary, which is enough to move a rasterised edge and the default card's
+  hash.
+- **The gradient is optional, where there is one.** The Gradient checkbox is
+  the Colour group's own label, which is what keeps the control bar to one row
+  — a sixth group, or a third item in Show, would wrap it and cost the page
+  its one-screen fit. Off, the card is the flat photo and the dropper, swatch,
+  Strength and Height are disabled; the picked colour is remembered, so
+  turning it back on restores exactly what was there. Under Centre the
+  checkbox itself is disabled and shows off, because there the absence of a
+  gradient is the design rather than something to switch on — but the user's
+  own on/off choice is held separately and comes back untouched on the way
+  out, so a gradient switched off by hand stays off through Centre and back.
 - **Colour is a dropper.** Arm it and click anywhere on the card to take the
   gradient colour from that point; a loupe magnifies the pixels under the cursor
   while you aim, and the chip shows the source hex beside a dot of the colour that
